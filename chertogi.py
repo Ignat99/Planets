@@ -4,6 +4,10 @@ from datetime import datetime, timedelta
 from skyfield.api import load
 
 # Загружаем эфемериды NASA и шкалу времени
+# https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/
+# https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de421.bsp
+# https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de442.bsp
+
 planets = load('de421.bsp')
 ts = load.timescale()
 
