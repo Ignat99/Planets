@@ -8,6 +8,7 @@ from skyfield.api import load
 # https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de421.bsp
 # https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de442.bsp
 
+# Загружаем эфемериды NASA и шкалу времени
 planets = load('de421.bsp')
 ts = load.timescale()
 
@@ -36,7 +37,7 @@ def calculate_position(target_date, body_name):
     astrometric = EARTH.at(t).observe(BODIES[body_name])
     
     # Геоцентрическая эклиптическая долгота (в градусах 0..360)
-    lat, lon, distance = astrometric.ecliptic_lat_lon()
+    lat, lon, distance = astrometric.ecliptic_latlon()
     deg = lon.degrees % 360
     
     # Перевод в Сварожий Круг (16 Чертогов по 22.5 градусов)
@@ -69,7 +70,7 @@ def update_calc(days_offset=0):
 # --- Создание графического интерфейса ---
 root = tk.Tk()
 root.title("Астро-Калькулятор Резонансов и Чертогов")
-root.geometry("440 x 380")
+root.geometry("440x380")
 root.resizable(False, False)
 
 style = ttk.Style()
