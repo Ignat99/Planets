@@ -1,0 +1,669 @@
+[
+  {
+    "no": 0,
+    "suit": "",
+    "module": 1,
+    "runa": "",
+    "name_slavic": "Ярило-Солнце",
+    "name_modern": "Солнце",
+    "moons": [],
+    "orbital_period": {
+      "years": null,
+      "days": null
+    },
+    "passes_one_chertog_days": null,
+    "passes_one_zal_days": null,
+    "chertog_zal_7504": "2-1",
+    "category": "Земли не имеющие Лун"
+  },
+  {
+    "no": 1,
+    "suit": "♣",
+    "module": 1,
+    "runa": "",
+    "name_slavic": "Хорсъ",
+    "name_modern": "Меркурий",
+    "moons": [],
+    "orbital_period": {
+      "years": 0.241,
+      "days": 88.0
+    },
+    "passes_one_chertog_days": 5.5,
+    "passes_one_zal_days": 0.611,
+    "chertog_zal_7504": "12-6",
+    "category": "Земли не имеющие Лун",
+    "best_yupana_coef": 84,
+    "calculated_days": 84.0,
+    "difference_days": 4.0,
+    "card_multiplier": 6,
+    "difference_percentage": "4.55%"
+  },
+  {
+    "no": 2,
+    "suit": "♣",
+    "module": 1,
+    "runa": "",
+    "name_slavic": "Заря-Мерцана",
+    "name_modern": "Венера",
+    "moons": [],
+    "orbital_period": {
+      "years": 0.615,
+      "days": 225.0
+    },
+    "passes_one_chertog_days": 14.06,
+    "passes_one_zal_days": 1.56,
+    "chertog_zal_7504": "2-5",
+    "category": "Земли не имеющие Лун",
+    "best_yupana_coef": 165,
+    "calculated_days": 220.0,
+    "difference_days": 5.0,
+    "card_multiplier": 8,
+    "difference_percentage": "2.22%"
+  },
+  {
+    "no": 3,
+    "suit": "♣",
+    "module": 1,
+    "runa": "",
+    "name_slavic": "Мидгардъ",
+    "name_modern": "Земля",
+    "moons": [
+      {
+        "name_slavic": "Леля",
+        "name_modern": "разрушена",
+        "orbital_period_years": 1.0,
+        "orbital_period_days": 7.0
+      },
+      {
+        "name_slavic": "Месяц",
+        "name_modern": "Луна",
+        "orbital_period_years": null,
+        "orbital_period_days": 29.5
+      }
+    ],
+    "orbital_period": {
+      "years": null,
+      "days": 365.25
+    },
+    "passes_one_chertog_days": 22.868,
+    "passes_one_zal_days": 2.536,
+    "chertog_zal_7504": "10-1",
+    "category": "Земли имеющие по две Луны",
+    "best_yupana_coef": 210,
+    "calculated_days": 350.0,
+    "difference_days": 15.25,
+    "card_multiplier": 10,
+    "difference_percentage": "4.18%"
+  },
+  {
+    "no": 4,
+    "suit": "♣",
+    "module": 1,
+    "runa": "",
+    "name_slavic": "Орей",
+    "name_modern": "Марс",
+    "moons": [
+      {
+        "name_slavic": "Кий",
+        "name_modern": "Фобос",
+        "orbital_period_years": null,
+        "orbital_period_days": null
+      },
+      {
+        "name_slavic": "Хариф",
+        "name_modern": "Демос",
+        "orbital_period_years": null,
+        "orbital_period_days": null
+      }
+    ],
+    "orbital_period": {
+      "years": 1.881,
+      "days": 686.979
+    },
+    "passes_one_chertog_days": 42.94,
+    "passes_one_zal_days": 4.77,
+    "chertog_zal_7504": "9-1",
+    "category": "Земли имеющие по две Луны",
+    "best_yupana_coef": 462,
+    "calculated_days": 693.0,
+    "difference_days": 6.021,
+    "card_multiplier": 9,
+    "difference_percentage": "0.88%"
+  },
+  {
+    "no": 5,
+    "suit": "♠",
+    "module": 11,
+    "runa": "",
+    "name_slavic": "Дэя",
+    "name_modern": "астероиды",
+    "moons": [
+      {
+        "name_slavic": "Фатта",
+        "name_modern": "фаэтон",
+        "orbital_period_years": null,
+        "orbital_period_days": null
+      },
+      {
+        "name_slavic": "Летиция",
+        "name_modern": "Люцифер",
+        "orbital_period_years": null,
+        "orbital_period_days": null
+      }
+    ],
+    "orbital_period": {
+      "years": 5.25,
+      "days": 1917.5625
+    },
+    "passes_one_chertog_days": 119.85,
+    "passes_one_zal_days": 13.32,
+    "chertog_zal_7504": "5-3",
+    "category": "Земли имеющие по две Луны",
+    "best_yupana_coef": 120,
+    "calculated_days": 1980.0,
+    "difference_days": 62.4375,
+    "card_multiplier": 9,
+    "difference_percentage": "3.26%"
+  },
+  {
+    "no": 6,
+    "suit": "♠",
+    "module": 11,
+    "runa": "",
+    "name_slavic": "Перунъ",
+    "name_modern": "Юпитер",
+    "moons": [
+      {
+        "name_slavic": "Джива",
+        "name_modern": "Европа"
+      },
+      {
+        "name_slavic": "Мара",
+        "name_modern": "Ио"
+      },
+      {
+        "name_slavic": "Дива",
+        "name_modern": "Ганимед"
+      },
+      {
+        "name_slavic": "Лика",
+        "name_modern": "Каллисто"
+      }
+    ],
+    "orbital_period": {
+      "years": 11.86,
+      "days": 4331.86
+    },
+    "passes_one_chertog_days": 270.74,
+    "passes_one_zal_days": 30.08,
+    "chertog_zal_7504": "6-2",
+    "category": "Земли имеющие больше двух Лун и кольцевое окружение",
+    "best_yupana_coef": 2431,
+    "calculated_days": 4456.8333,
+    "difference_days": 124.9733,
+    "card_multiplier": 1,
+    "difference_percentage": "2.88%"
+  },
+  {
+    "no": 7,
+    "suit": "♠",
+    "module": 11,
+    "runa": "",
+    "name_slavic": "Стрибогъ",
+    "name_modern": "Сатурн",
+    "moons": [],
+    "orbital_period": {
+      "years": 29.46,
+      "days": 10760.26
+    },
+    "passes_one_chertog_days": 672.52,
+    "passes_one_zal_days": 74.72,
+    "chertog_zal_7504": "9-4/5",
+    "category": "Земли имеющие больше двух Лун и кольцевое окружение",
+    "best_yupana_coef": 924,
+    "calculated_days": 10164.0,
+    "difference_days": 596.26,
+    "card_multiplier": 6,
+    "difference_percentage": "5.54%"
+  },
+  {
+    "no": 8,
+    "suit": "♠",
+    "module": 11,
+    "runa": "",
+    "name_slavic": "Индра",
+    "name_modern": "Хирон(астероид)",
+    "moons": [],
+    "orbital_period": {
+      "years": 58.92,
+      "days": 21520.53
+    },
+    "passes_one_chertog_days": 1345.0,
+    "passes_one_zal_days": 149.45,
+    "chertog_zal_7504": "15-2",
+    "category": "Земли имеющие больше двух Лун и кольцевое окружение",
+    "best_yupana_coef": 1716,
+    "calculated_days": 22022.0,
+    "difference_days": 501.47,
+    "card_multiplier": 7,
+    "difference_percentage": "2.33%"
+  },
+  {
+    "no": 9,
+    "suit": "♠",
+    "module": 11,
+    "runa": "",
+    "name_slavic": "Варуна",
+    "name_modern": "Уран",
+    "moons": [],
+    "orbital_period": {
+      "years": 84.02,
+      "days": 30688.3
+    },
+    "passes_one_chertog_days": 1918.0,
+    "passes_one_zal_days": 213.11,
+    "chertog_zal_7504": "6-7/6",
+    "category": "Земли имеющие больше двух Лун и кольцевое окружение",
+    "best_yupana_coef": 3432,
+    "calculated_days": 31460.0,
+    "difference_days": 771.7,
+    "card_multiplier": 5,
+    "difference_percentage": "2.51%"
+  },
+  {
+    "no": 10,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Ний",
+    "name_modern": "Нептун",
+    "moons": [],
+    "orbital_period": {
+      "years": 164.79,
+      "days": 60189.55
+    },
+    "passes_one_chertog_days": 3761.85,
+    "passes_one_zal_days": 418.0,
+    "chertog_zal_7504": "7-3",
+    "category": "Земли системы-гиганты",
+    "best_yupana_coef": 792,
+    "calculated_days": 63888.0,
+    "difference_days": 3698.45,
+    "card_multiplier": 4,
+    "difference_percentage": "6.14%"
+  },
+  {
+    "no": 11,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Вий",
+    "name_modern": "Плутон",
+    "moons": [],
+    "orbital_period": {
+      "years": 248.7,
+      "days": 90837.68
+    },
+    "passes_one_chertog_days": 5677.36,
+    "passes_one_zal_days": 630.8,
+    "chertog_zal_7504": "16-3/4",
+    "category": "Земли системы-гиганты",
+    "best_yupana_coef": 495,
+    "calculated_days": 89842.5,
+    "difference_days": 995.18,
+    "card_multiplier": 9,
+    "difference_percentage": "1.10%"
+  },
+  {
+    "no": 12,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Велесъ",
+    "name_modern": "Вулкан",
+    "moons": [],
+    "orbital_period": {
+      "years": 346.78,
+      "days": 126661.39
+    },
+    "passes_one_chertog_days": 7916.34,
+    "passes_one_zal_days": 879.59,
+    "chertog_zal_7504": "4-6/7",
+    "category": "Земли системы-гиганты",
+    "best_yupana_coef": 792,
+    "calculated_days": 127776.0,
+    "difference_days": 1114.61,
+    "card_multiplier": 8,
+    "difference_percentage": "0.88%"
+  },
+  {
+    "no": 13,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Сѣмарглъ",
+    "name_modern": "Даур",
+    "moons": [],
+    "orbital_period": {
+      "years": 485.49,
+      "days": 177325.22
+    },
+    "passes_one_chertog_days": 11082.83,
+    "passes_one_zal_days": 1231.4,
+    "chertog_zal_7504": "3-9",
+    "category": "Земли системы-гиганты",
+    "best_yupana_coef": 1716,
+    "calculated_days": 173030.0,
+    "difference_days": 4295.22,
+    "card_multiplier": 5,
+    "difference_percentage": "2.42%"
+  },
+  {
+    "no": 14,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Одинъ",
+    "name_modern": "Прозерпина",
+    "moons": [],
+    "orbital_period": {
+      "years": 689.69,
+      "days": 248256.77
+    },
+    "passes_one_chertog_days": 15516.0,
+    "passes_one_zal_days": 1724.0,
+    "chertog_zal_7504": "3-3",
+    "category": "Земли системы-гиганты",
+    "best_yupana_coef": 1716,
+    "calculated_days": 242242.0,
+    "difference_days": 6014.77,
+    "card_multiplier": 7,
+    "difference_percentage": "2.42%"
+  },
+  {
+    "no": 15,
+    "suit": "♥",
+    "module": 121,
+    "runa": "",
+    "name_slavic": "Лада",
+    "name_modern": "Изида",
+    "moons": [],
+    "orbital_period": {
+      "years": 883.6,
+      "days": 322734.9
+    },
+    "passes_one_chertog_days": 20170.93,
+    "passes_one_zal_days": 2241.2,
+    "chertog_zal_7504": "11/9-12/1",
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 1716,
+    "calculated_days": 346060.0,
+    "difference_days": 23325.1,
+    "card_multiplier": 10,
+    "difference_percentage": "7.23%"
+  },
+  {
+    "no": 16,
+    "suit": "♦",
+    "module": 1331,
+    "runa": "",
+    "name_slavic": "Удрзецъ",
+    "name_modern": "Осирис",
+    "moons": [],
+    "orbital_period": {
+      "years": 1147.38,
+      "days": 419307.0
+    },
+    "passes_one_chertog_days": 26206.0,
+    "passes_one_zal_days": 2911.8,
+    "chertog_zal_7504": "10/9-11/1",
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 210,
+    "calculated_days": 419265.0,
+    "difference_days": 42.0,
+    "card_multiplier": 9,
+    "difference_percentage": "0.01%"
+  },
+  {
+    "no": 17,
+    "suit": "♦",
+    "module": 1331,
+    "runa": "",
+    "name_slavic": "Коляда",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 1501.62,
+      "days": 549189.9
+    },
+    "passes_one_chertog_days": 34324.4,
+    "passes_one_zal_days": 3813.8,
+    "chertog_zal_7504": "5/9-6/1",
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 252,
+    "calculated_days": 559020.0,
+    "difference_days": 9830.1,
+    "card_multiplier": 10,
+    "difference_percentage": "1.79%"
+  },
+  {
+    "no": 18,
+    "suit": "♦",
+    "module": 1331,
+    "runa": "",
+    "name_slavic": "Радегоста",
+    "name_modern": "Вакшья (Вакша)",
+    "moons": [],
+    "orbital_period": {
+      "years": 1952.11,
+      "days": 712968.0
+    },
+    "passes_one_chertog_days": 44560.5,
+    "passes_one_zal_days": 4951.2,
+    "chertog_zal_7504": "10/9-11/1",
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 792,
+    "calculated_days": 702768.0,
+    "difference_days": 10200.0,
+    "card_multiplier": 4,
+    "difference_percentage": "1.43%"
+  },
+  {
+    "no": 19,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Тора",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 2537.75,
+      "days": 926931.45
+    },
+    "passes_one_chertog_days": 57933.2,
+    "passes_one_zal_days": 6437.0,
+    "chertog_zal_7504": "7/8-7/9",
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 45,
+    "calculated_days": 988267.5,
+    "difference_days": 61336.05,
+    "card_multiplier": 9,
+    "difference_percentage": "6.62%"
+  },
+  {
+    "no": 20,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Прове",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 3456.0,
+      "days": 1262304.0
+    },
+    "passes_one_chertog_days": 78894.0,
+    "passes_one_zal_days": 8766.0,
+    "chertog_zal_7504": null,
+    "category": "Земли системного отображения",
+    "best_yupana_coef": 120,
+    "calculated_days": 1464100.0,
+    "difference_days": 201796.0,
+    "card_multiplier": 5,
+    "difference_percentage": "15.99%"
+  },
+  {
+    "no": 21,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Крода",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 3888.0,
+      "days": 1420092.0
+    },
+    "passes_one_chertog_days": 88755.8,
+    "passes_one_zal_days": 9861.8,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 56,
+    "calculated_days": 1366493.3333,
+    "difference_days": 53598.6667,
+    "card_multiplier": 10,
+    "difference_percentage": "3.77%"
+  },
+  {
+    "no": 22,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Полкана",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 4752.0,
+      "days": 1735668.0
+    },
+    "passes_one_chertog_days": 108479.25,
+    "passes_one_zal_days": 12053.25,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 84,
+    "calculated_days": 1639792.0,
+    "difference_days": 95876.0,
+    "card_multiplier": 8,
+    "difference_percentage": "5.52%"
+  },
+  {
+    "no": 23,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Змiя",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 5904.0,
+      "days": 2156436.0
+    },
+    "passes_one_chertog_days": 134777.25,
+    "passes_one_zal_days": 14975.25,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 210,
+    "calculated_days": 2049740.0,
+    "difference_days": 106696.0,
+    "card_multiplier": 4,
+    "difference_percentage": "4.95%"
+  },
+  {
+    "no": 24,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Ругия",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 6912.0,
+      "days": 2524608.0
+    },
+    "passes_one_chertog_days": 157788.0,
+    "passes_one_zal_days": 17532.0,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 495,
+    "calculated_days": 2415765.0,
+    "difference_days": 108843.0,
+    "card_multiplier": 2,
+    "difference_percentage": "4.31%"
+  },
+  {
+    "no": 25,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Чура",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 9504.0,
+      "days": 3471336.0
+    },
+    "passes_one_chertog_days": 216958.5,
+    "passes_one_zal_days": 24165.0,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 252,
+    "calculated_days": 3689532.0,
+    "difference_days": 218196.0,
+    "card_multiplier": 6,
+    "difference_percentage": "6.29%"
+  },
+  {
+    "no": 26,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Догоды",
+    "name_modern": "Седна",
+    "moons": [],
+    "orbital_period": {
+      "years": 12883.0,
+      "days": 4705515.75
+    },
+    "passes_one_chertog_days": 266267.25,
+    "passes_one_zal_days": 29585.25,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 252,
+    "calculated_days": 4304454.0,
+    "difference_days": 401061.75,
+    "card_multiplier": 7,
+    "difference_percentage": "8.52%"
+  },
+  {
+    "no": 27,
+    "suit": "★",
+    "module": 14641,
+    "runa": "",
+    "name_slavic": "Земля Дайма",
+    "name_modern": "не обнаружена",
+    "moons": [],
+    "orbital_period": {
+      "years": 15552.0,
+      "days": 5680368.0
+    },
+    "passes_one_chertog_days": 355023.0,
+    "passes_one_zal_days": 39447.0,
+    "chertog_zal_7504": null,
+    "category": "Земли порубежного контроля",
+    "best_yupana_coef": 2431,
+    "calculated_days": 5932045.1667,
+    "difference_days": 251677.1667,
+    "card_multiplier": 1,
+    "difference_percentage": "4.43%"
+  }
+]
