@@ -4,6 +4,7 @@ import base64
 import requests
 
 # Define API URL and SPK filename:
+# https://ssd-api.jpl.nasa.gov/doc/horizons.html
 url = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 spk_filename = 'spk_file.bsp'
 
