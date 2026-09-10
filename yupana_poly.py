@@ -31,43 +31,115 @@ y8d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) * (xd + 5) * (xd + 6) / 504
 y9d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) * (xd + 5) * (xd + 6) * (xd + 7) / 40320
 
 
-# 2. Дискретные узлы из вашей таблицы (полностью восстановлены)
-nodes_x1 = [1, 2, 3, 4, 5, 6]
-nodes_y1 = [1, 1, 1, 1, 1, 1]
+# Базовые массивы (так как ypana строится на их основе)
+nodes_y1 = np.array([1, 1, 1, 1, 1, 1])
+nodes_x1 = np.array([1, 2, 3, 4, 5, 6])
+nodes_y3 = np.array([6, 10, 15, 21])
+nodes_y4 = np.array([20, 35, 56])
+nodes_y5 = np.array([70, 126])
+nodes_y6 = np.array([252])
 
-nodes_x2 = [1, 2, 3, 4, 5]
-nodes_y2 = [2, 3, 4, 5, 6]
+# Сборка строк ypana чисто через функции NumPy (hstack объединяет массивы горизонтально)
+ypana_y1 = np.hstack(([1], nodes_y1))
+ypana_y2 = np.hstack((nodes_x1, [7]))
+ypana_y3 = np.hstack(([1, 3], nodes_y3, [28]))
+ypana_y4 = np.hstack(([1, 4, 10], nodes_y4, [84]))
+ypana_y5 = np.hstack(([1, 5, 15, 35], nodes_y5, [210]))
+ypana_y6 = np.hstack(([1, 6, 21, 56, 126], nodes_y6, [462]))
+ypana_y7 = np.array([1, 7, 28, 84, 210, 462, 924])
 
-nodes_x3 = [1, 2, 3, 4]
-nodes_y3 = [6, 10, 15, 21]
+# Создаем пустую матрицу 7x7 из нулей
+ypana = np.zeros((7, 7), dtype=int)
 
-nodes_x4 = [1, 2, 3]
-nodes_y4 = [20, 35, 56]
+# Заполняем каждую строку (первая строка ypana_y1 имеет длину 7, остальные тоже)
+ypana[0, :] = ypana_y1
+ypana[1, :] = ypana_y2
+ypana[2, :] = ypana_y3
+ypana[3, :] = ypana_y4
+ypana[4, :] = ypana_y5
+ypana[5, :] = ypana_y6
+ypana[6, :] = ypana_y7
 
-nodes_x5 = [1, 2]
-nodes_y5 = [70, 126]
+print(ypana)
 
-nodes_x6 = [1]
-nodes_y6 = [252]
+fib_1 = ypana[0,0]
+fib_1_list = [
+    [0, 0]
+] # 1
 
-# 2.5 Ypana
-ypana_y1 = [1] + nodes_y1
-ypana_y2 = nodes_x1 + [7]
-ypana_y3 = [1, 3] + nodes_y3 + [28]
-ypana_y4 = [1, 4, 10] + nodes_y4 + [84]
-ypana_y5 = [1, 5, 15, 35] + nodes_y5 + [210]
-ypana_y6 = [1, 6, 21, 56, 126] + nodes_y6 + [462]
-ypana_y7 = [1, 7, 28, 84, 210, 462, 924]
+fib_2 = ypana[1,0]
+fib_2_list = [[1, 0]]  # 1
 
-ypana = [
-    nodes_y1,
-    ypana_y2,
-    ypana_y3,
-    ypana_y4,
-    ypana_y5,
-    ypana_y6,
-    ypana_y7
-]
+fib_3 = ypana[2,0] + ypana[0,1]
+fib_3_list = [[2.0],[0,1]] # 2
+
+fib_4 = ypana[3,0] + ypana[1,1]
+fib_4_list = [[3,0], [1,1]] # 3
+
+fib_5 = ypana[4,0] + ypana[2,1] + ypana[0,2]
+fib_5_list = [[4,0], [2,1], [0,2]] # 5
+
+fib_6 = ypana[5,0] + ypana[3,1] + ypana[1,3]
+fib_6_list = [[5,0],[3,1], [1,2]] # 8
+
+fib_7 = ypana[6,0] + ypana[4,1] + ypana[2,2] + ypana[0,3]
+fib_7_list = [[6,0],[4,1],[2,2],[0,3]] # 13
+
+#fib_8 = ypana[7,0] + ypana[5,1] + ypana[3,2] + ypana[1,4]
+#fib_8_list = [[7,0],[5,1],[3,2],[1,3]] # 21
+
+#fib_9 = ypana[8.0] + ypana[6,1] + ypana[4,2] + ypana[2,3] + ypana[0,4]
+#fib_9_list = [[8.0], [6,1], [4,2],[2,3],[0,4]] # 34
+
+# 1. Генерируем расширенную матрицу ypana (треугольник Паскаля) размером 9x9 через NumPy
+# Это необходимо, чтобы работали индексы из fib_8 и fib_9 (строки 7 и 8)
+ypana = np.zeros((9, 9), dtype=int)
+for i in range(9):
+    for j in range(9):
+        if i == 0:
+            ypana[i, j] = 1
+        elif j == 0:
+            ypana[i, j] = 1
+        else:
+            ypana[i, j] = ypana[i-1, j] + ypana[i, j-1]
+
+print(ypana)
+
+# 2. Автоматическая генерация координат и значений Фибоначчи на NumPy
+fib_values = {}
+fib_coords = {}
+
+for n in range(1, 10):  # Для fib_1 ... fib_9
+    # Для каждого n сумма индексов строки (r) и столбца (c) равна n - 1.
+    # При этом строка уменьшается на 2, а столбец увеличивается на 1.
+    
+    # Генерируем массив строк: от (n-1) вниз до 0 с шагом -2
+    rows = np.arange(n - 1, -1, -2)
+    # Генерируем массив столбцов: от 0 вверх с шагом 1
+    cols = np.arange(0, len(rows))
+    
+    # Объединяем их в двумерную матрицу координат (размерность К x 2)
+    coords_matrix = np.column_stack((rows, cols))
+    
+    # Извлекаем значения из ypana по сгенерированным координатам и суммируем их
+    value = np.sum(ypana[rows, cols])
+    
+    # Сохраняем в словари (для удобства работы)
+    fib_coords[f"fib_{n}_coords"] = coords_matrix
+    fib_values[f"fib_{n}_value"] = value
+
+# ==========================================
+# ДЕМОНСТРАЦИЯ РЕЗУЛЬТАТОВ (Вывод на экран)
+# ==========================================
+
+# Выведем конкретный пример, например для fib_5 и fib_9, как в вашем запросе:
+for n in range(1, 10):
+    print(f"--- fib_{n} ---")
+    print(f"Значение Фибоначчи: {fib_values[f'fib_{n}_value']}")
+    print("Матрица координат NumPy:")
+    print(fib_coords[f"fib_{n}_coords"])
+    print(f"Тип объекта координат: {type(fib_coords[f'fib_{n}_coords'])}\n")
+
 
 # 3. ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ НЕПРЕРЫВНЫХ КРИВЫХ ФИБОНАЧЧИ
 def fibonacci_trajectory(x_range, const_val):
