@@ -4,6 +4,9 @@ from scipy.special import gamma
 
 # 1. Расширенный диапазон для непрерывных кривых от -10 до 10
 x = np.linspace(-10.0, 10.0, 1000)
+# 1. Расширенный диапазон для непрерывных кривых от -10 до 10 (настоящий)
+xd = np.linspace(-10.0, 10.0, 20)
+
 
 # Формулы 9 полиномов Паскаля (симплициальных чисел)
 y1 = np.ones_like(x)
@@ -15,6 +18,18 @@ y6 = x * (x + 1) * (x + 2) * (x + 3) * (x + 4) / 120
 y7 = x * (x + 1) * (x + 2) * (x + 3) * (x + 4) * (x + 5) / 720
 y8 = x * (x + 1) * (x + 2) * (x + 3) * (x + 4) * (x + 5) * (x + 6) / 5040
 y9 = x * (x + 1) * (x + 2) * (x + 3) * (x + 4) * (x + 5) * (x + 6) * (x + 7) / 40320
+
+# Формулы 9 полиномов Паскаля (симплициальных чисел) (настоящих)
+y1d = np.ones_like(xd)
+y2d = xd
+y3d = xd * (xd + 1) / 2
+y4d = xd * (xd + 1) * (xd + 2) / 6
+y5d = xd * (xd + 1) * (xd + 2) * (xd + 3) / 24
+y6d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) / 120
+y7d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) * (xd + 5) / 720
+y8d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) * (xd + 5) * (xd + 6) / 5040
+y9d = xd * (xd + 1) * (xd + 2) * (xd + 3) * (xd + 4) * (xd + 5) * (xd + 6) * (xd + 7) / 40320
+
 
 # 2. Дискретные узлы из вашей таблицы (полностью восстановлены)
 nodes_x1 = [1, 2, 3, 4, 5, 6]
@@ -34,6 +49,25 @@ nodes_y5 = [70, 126]
 
 nodes_x6 = [1]
 nodes_y6 = [252]
+
+# 2.5 Ypana
+ypana_y1 = [1] + nodes_y1
+ypana_y2 = nodes_x1 + [7]
+ypana_y3 = [1, 3] + nodes_y3 + [28]
+ypana_y4 = [1, 4, 10] + nodes_y4 + [84]
+ypana_y5 = [1, 5, 15, 35] + nodes_y5 + [210]
+ypana_y6 = [1, 6, 21, 56, 126] + nodes_y6 + [462]
+ypana_y7 = [1, 7, 28, 84, 210, 462, 924]
+
+ypana = [
+    nodes_y1,
+    ypana_y2,
+    ypana_y3,
+    ypana_y4,
+    ypana_y5,
+    ypana_y6,
+    ypana_y7
+]
 
 # 3. ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ НЕПРЕРЫВНЫХ КРИВЫХ ФИБОНАЧЧИ
 def fibonacci_trajectory(x_range, const_val):
@@ -75,13 +109,13 @@ for k in [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]:
     plt.plot(x_fib, y_fib, color='black', linestyle='--', linewidth=1.5, zorder=4,
              label=f'Траектория Фибоначчи (K={k})' if k==5 else "")
 
-# Нанесение дискретных точек пересечений
-plt.scatter(nodes_x1, nodes_y1, color='gray', edgecolor='black', s=45, zorder=5)
-plt.scatter(nodes_x2, nodes_y2, color='red', edgecolor='black', s=45, zorder=5)
-plt.scatter(nodes_x3, nodes_y3, color='blue', edgecolor='black', s=45, zorder=5)
-plt.scatter(nodes_x4, nodes_y4, color='orange', edgecolor='black', s=45, zorder=5)
-plt.scatter(nodes_x5, nodes_y5, color='green', edgecolor='black', s=45, zorder=5)
-plt.scatter(nodes_x6, nodes_y6, color='purple', edgecolor='black', s=45, zorder=5)
+# Нанесение дискретных точек пересечений (настоящих)
+plt.scatter(xd, y1d, color='gray', edgecolor='black', s=45, zorder=5)
+plt.scatter(xd, y2d, color='red', edgecolor='black', s=45, zorder=5)
+plt.scatter(xd, y3d, color='blue', edgecolor='black', s=45, zorder=5)
+plt.scatter(xd, y4d, color='orange', edgecolor='black', s=45, zorder=5)
+plt.scatter(xd, y5d, color='green', edgecolor='black', s=45, zorder=5)
+plt.scatter(xd, y6d, color='purple', edgecolor='black', s=45, zorder=5)
 
 # Оси координат Ox и Oy
 plt.axhline(0, color='black', linewidth=1.0, alpha=0.5)
