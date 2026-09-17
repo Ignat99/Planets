@@ -1,21 +1,25 @@
 """
 Сравнение моделей прецессии с NASA DE422.
-Ревизия 4: геометрические позиции, консистентный P_391838_et,
-прямое сравнение скоростей прецессии.
+Ревизия 5: интегрирование domega(t), угловая разность, переименование GR_obs.
 
 Модели:
-  GR (DE422−VSOP87):  dϖ/dt(DE422) − dϖ/dt(VSOP87E)            — наблюдаемая GR-поправка
-  P0:                 K / a₀^(5/2)                             — без e-поправки
-  P_GR:               K / (a₀^(5/2) * (1-e₀²))                 — стандартная GR
-  P_391838:           (K + L*(A391838(e₀)-1)) / a₀^(5/2)       — A391838, постоянные a₀, e₀
-  P_391838_et:        (K + L*(A391838(e(t))-1)) / a(t)^(5/2)   — A391838, оскулирующие a(t), e(t)
+  DE422_minus_VSOP:  dϖ/dt(DE422) − dϖ/dt(VSOP87E)               — диагностическая разность
+  P0:                 K / a₀^(5/2)                                — без e-поправки
+  P_GR:               K / (a₀^(5/2) * (1-e₀²))                    — стандартная GR
+  P_391838:           (K + L*(A391838(e₀)-1)) / a₀^(5/2)          — A391838, постоянные a₀, e₀
+  P_391838_et:        (K + L*(A391838(e(t))-1)) / a(t)^(5/2)      — A391838, оскулирующие a(t), e(t)
 
-Ключевые исправления:
-  1. real_helio_long — прямой вектор body−Sun, без observe()
-  2. Earth — planets[399] (геоцентр), не planets[3] (EMB)
-  3. P_391838_et — M(t) из эфемериды, а не из e_start; a(t) оскулирующая
-  4. Прямое сравнение dϖ/dt: наблюдение vs модели
-  5. varpi(t) — из вектора эксцентриситета, не константа J2000
+Ключевые исправления (от rev.4 к rev.5):
+  1. P_391838_et и DE422_minus_VSOP — кумулятивное интегрирование domega(t)
+     вместо domega(t)*day (трапецеидальное суммирование)
+  2. dvarpi_de422 — угловая разность через angular_difference_deg()
+     для корректной обработки перехода через 0/360°
+  3. GR_obs → DE422_minus_VSOP — диагностическая разность, а не «наблюдаемая GR-поправка»
+  4. compute_gr_component() удалена (содержала логическую ошибку)
+  5. varpi — проекционная долгота вектора эксцентриситета (не 3D Ω+ω)
+  6. osculating_full — Sun-only оскулирующие элементы из DE422
+  7. Earth: DE422 planets[399] vs VSOP87E EMB — несогласованность отмечена
+  8. Mars Newtonian 1598.2 — помечен как ориентировочная оценка
 
 Требования: pip install skyfield numpy matplotlib
 """
@@ -37,7 +41,7 @@ from skyfield.api import load
 #          Полная из DE422 ≈ 1599.5 → Newtonian ≈ 1598.2
 NEWTONIAN_PLANETARY = {
     'Mercury': 532.3035,   # arcsec/century, хорошо подтверждено
-    'Mars':    1598.2,     # ПРИБЛИЖЁННО, требует верификации источника
+    'Mars':    1598.2,     # ОРИЕНТИРОВОЧНО, требует верификации источника
 }
 
 # Солнечный J2 (малый вклад, для справки)
@@ -45,6 +49,24 @@ SOLAR_J2_CONTRIBUTION = {
     'Mercury': 0.0286,
     'Mars':    0.00013,   # значительно меньше
 }
+
+# ============================================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ============================================================
+
+def angular_difference_deg(angle2, angle1):
+    """Угловая разность в градусах с корректной обработкой перехода через 0/360°."""
+    return (angle2 - angle1 + 180.0) % 360.0 - 180.0
+
+def cumulative_trapezoid_manual(y, x):
+    """Кумулятивное трапецеидальное интегрирование без SciPy.
+    Возвращает массив той же длины, что и вход, с initial=0.
+    """
+    result = np.zeros(len(y))
+    for i in range(1, len(y)):
+        result[i] = result[i - 1] + 0.5 * (y[i] + y[i - 1]) * (x[i] - x[i - 1])
+    return result
+
 
 # ============================================================
 # ЗАГРУЗКА ЭФЕМЕРИДЫ
@@ -56,10 +78,13 @@ ts = load.timescale()
 SUN = planets[10]
 
 # Небесные тела — геоцентр Земли (399), не EMB (3)
+# ВНИМАНИЕ: VSOP87E для Земли загружается из VSOP87.emb (барицентр Земля-Луна),
+# что создаёт несогласованность DE422 Earth vs VSOP87E EMB.
+# Для строгого сравнения нужно либо EMB vs EMB, либо исключить Землю из прецессионного анализа.
 BODIES = {
     'Mercury': planets[1],
     'Venus':   planets[2],
-    'Earth':   planets[399],   # ИСПРАВЛЕНО: геоцентр Земли
+    'Earth':   planets[399],   # геоцентр Земли, не EMB
     'Mars':    planets[4],
     'Jupiter': planets[5],
     'Saturn':  planets[6],
@@ -229,10 +254,20 @@ def download_vsop87e(name):
 # ============================================================
 # ОСКУЛИРУЮЩИЕ ЭЛЕМЕНТЫ (полный набор)
 # ============================================================
+# ВНИМАНИЕ: Это Sun-only оскулирующие элементы, вычисленные из DE422 state vector
+# с использованием двухтельных формул и солнечного GM.
+# Они содержат короткопериодические колебания от планетных возмущений,
+# уже заложенных в DE422, но не являются эквивалентом динамических элементов
+# VSOP87E или канонических элементов DE422.
 def osculating_full(name, dt):
     """
     Полный набор оскулирующих элементов в эклиптической системе J2000.
     Возвращает (a_osc, e_osc, varpi_deg, M_rad).
+
+    varpi_deg — проекционная долгота вектора эксцентриситета на плоскость
+    J2000 ecliptic. Это не полная 3D-долгота перицентра (Ω + ω).
+    Для Меркурия (i≈7°) и Марса (i≈1.85°) наклонение может давать
+    поправки на уровне угловых секунд за столетие.
     """
     r_vec, v_vec = helio_position(name, dt)
 
@@ -253,7 +288,8 @@ def osculating_full(name, dt):
     e_osc = np.sqrt(np.sum(e_vec**2))
     e_osc = min(max(e_osc, 0.0), 0.99)
 
-    # Долгота перигелия в эклиптической системе
+    # Проекционная долгота вектора эксцентриситета на плоскость J2000 ecliptic.
+    # Это не полная 3D-долгота перицентра (Ω + ω).
     varpi_deg = np.degrees(np.arctan2(e_vec[1], e_vec[0])) % 360.0
 
     # Истинная аномалия: угол между e_vec и r_vec
@@ -266,78 +302,128 @@ def osculating_full(name, dt):
     return a_osc, e_osc, varpi_deg, M
 
 # ============================================================
-# МОДЕЛЬНАЯ ДОЛГОТА
+# МОДЕЛЬНАЯ ДОЛГОТА — для постоянных моделей (одиночная точка)
 # ============================================================
 def compute_model_long(name, model, start_date, day):
     """
-    Вычисляет модельную долготу.
-    
-    Для P0, P_GR, P_391838: постоянные a₀, e₀, varpi₀, period.
-    Для P_391838_et: оскулирующие a(t), e(t), M(t) из DE422.
-                     Только скорость прецессии ϖ заменяется на A391838.
+    Вычисляет модельную долготу для постоянных моделей (P0, P_GR, P_391838).
+    Для моделей с переменной скоростью (P_391838_et, DE422_minus_VSOP)
+    используйте compute_model_long_array() — с кумулятивным интегрированием.
     """
     p = PLANETS[name]
 
-    if model == 'GR_obs':
-        # Наблюдаемая GR-поправка: dϖ/dt из (DE422 − VSOP87E)
-        dt_current = start_date + timedelta(days=day)
-        a_t, e_t, varpi_real, M_t = osculating_full(name, dt_current)
+    if model in ('P_391838_et', 'DE422_minus_VSOP'):
+        raise ValueError(
+            f"Model {model} requires cumulative integration. "
+            "Use compute_model_long_array() instead."
+        )
 
-        # VSOP87E производная перигелия
-        t_mill = datetime_to_vsop87_t(dt_current)
-        _, _, dvarpi_vsop = vsop87e_compute(vsop_data[name], t_mill)
+    # --- Простые модели: постоянные a₀, e₀ ---
+    period = p['period']
+    e0 = p['e']
+    varpi0 = np.radians(p['varpi0'])
+    n = 2 * np.pi / period
 
-        # Полная производная из DE422 (численно — через соседние точки)
-        dt_prev = start_date + timedelta(days=day - 1)
-        dt_next = start_date + timedelta(days=day + 1)
-        _, _, varpi_prev, _ = osculating_full(name, dt_prev)
-        _, _, varpi_next, _ = osculating_full(name, dt_next)
-        dvarpi_de422 = (varpi_next - varpi_prev) / 2.0  # град/день
+    domega = precession_deg_per_day(model, p['a'], e0)
 
-        # GR-поправка = DE422 − VSOP87
-        dvarpi_vsop_deg_day = dvarpi_vsop / 3600.0 / 100.0 / 365.25
-        gr_rate = dvarpi_de422 - dvarpi_vsop_deg_day  # град/день
+    lon_0, _ = real_helio_long(name, start_date)
+    nu_0 = (np.radians(lon_0) - varpi0 + np.pi) % (2 * np.pi) - np.pi
+    M_0 = true_to_mean_anomaly(nu_0, e0)
 
-        # varpi_model: varpi(0) + интеграл GR-поправки
-        a0, e0, varpi_0, M_0 = osculating_full(name, start_date)
-        varpi_model = np.radians(varpi_0) + np.radians(gr_rate) * day
+    M = M_0 + n * day
+    varpi = varpi0 + np.radians(domega) * day
+    lon = np.degrees(varpi + true_anomaly(M, e0)) % 360.0
+    return lon
 
-        lon = np.degrees(varpi_model + true_anomaly(M_t, e_t)) % 360.0
-        return lon
 
-    elif model == 'P_391838_et':
-        # --- Консистентная модель: M(t) и e(t) из эфемериды ---
-        dt_current = start_date + timedelta(days=day)
-        a_t, e_t, varpi_real, M_t = osculating_full(name, dt_current)
+# ============================================================
+# МОДЕЛЬНАЯ ДОЛГОТА — массив с кумулятивным интегрированием
+# ============================================================
+def compute_model_long_array(name, model, start_date, days_arr, vsop_data):
+    """
+    Вычисляет модельные долготы для массива дней.
 
-        # Скорость прецессии с оскулирующими a(t), e(t)
-        domega = precession_deg_per_day(model, a_t, e_t)
+    Для постоянных моделей (P0, P_GR, P_391838): domega = const,
+    поэтому domega * day точно — перебор по точкам.
 
-        # varpi_model: начинаем с реального varpi(0), добавляем модельную прецессию
-        a0, e0, varpi_0, M_0 = osculating_full(name, start_date)
-        varpi_model = np.radians(varpi_0) + np.radians(domega) * day
+    Для переменных моделей (P_391838_et, DE422_minus_VSOP):
+    кумулятивное трапецеидальное интегрирование domega(t):
+      varpi(t) = varpi(0) + ∫₀ᵗ domega(τ) dτ
+    """
+    days_float = days_arr.astype(float)
+
+    if model in ('P_391838_et', 'DE422_minus_VSOP'):
+        # --- Переменные модели: кумулятивное интегрирование ---
+
+        # Первый проход: собираем оскулирующие элементы
+        a_arr = np.zeros(len(days_arr))
+        e_arr = np.zeros(len(days_arr))
+        varpi_arr = np.zeros(len(days_arr))
+        M_arr = np.zeros(len(days_arr))
+
+        for i, day in enumerate(days_arr):
+            dt = start_date + timedelta(days=int(day))
+            a_t, e_t, varpi_t, M_t = osculating_full(name, dt)
+            a_arr[i] = a_t
+            e_arr[i] = e_t
+            varpi_arr[i] = varpi_t
+            M_arr[i] = M_t
+
+        varpi_0 = varpi_arr[0]
+
+        # Вычисление массива скоростей прецессии
+        domega_arr = np.zeros(len(days_arr))
+
+        if model == 'P_391838_et':
+            for i in range(len(days_arr)):
+                domega_arr[i] = precession_deg_per_day(model, a_arr[i], e_arr[i])
+
+        elif model == 'DE422_minus_VSOP':
+            for i in range(len(days_arr)):
+                # DE422 мгновенная скорость прецессии (центральная разность
+                # с корректной угловой разностью)
+                if i == 0:
+                    dvarpi_de422 = (
+                        angular_difference_deg(varpi_arr[1], varpi_arr[0])
+                        / (days_float[1] - days_float[0])
+                    )
+                elif i == len(days_arr) - 1:
+                    dvarpi_de422 = (
+                        angular_difference_deg(varpi_arr[-1], varpi_arr[-2])
+                        / (days_float[-1] - days_float[-2])
+                    )
+                else:
+                    dvarpi_de422 = (
+                        angular_difference_deg(varpi_arr[i + 1], varpi_arr[i - 1])
+                        / (days_float[i + 1] - days_float[i - 1])
+                    )
+
+                # VSOP87E аналитическая скорость прецессии
+                dt = start_date + timedelta(days=int(days_arr[i]))
+                t_mill = datetime_to_vsop87_t(dt)
+                _, _, dvarpi_vsop = vsop87e_compute(vsop_data[name], t_mill)
+                dvarpi_vsop_deg_day = dvarpi_vsop / 3600.0 / 100.0 / 365.25
+
+                # Диагностическая разность: DE422 − VSOP87E
+                domega_arr[i] = dvarpi_de422 - dvarpi_vsop_deg_day
+
+        # Кумулятивное трапецеидальное интегрирование
+        varpi_integrated = np.radians(varpi_0) + np.radians(
+            cumulative_trapezoid_manual(domega_arr, days_float)
+        )
 
         # Истинная аномалия из реального M(t) и e(t)
-        lon = np.degrees(varpi_model + true_anomaly(M_t, e_t)) % 360.0
-        return lon
+        longitudes = np.degrees(
+            varpi_integrated + true_anomaly(M_arr, e_arr)
+        ) % 360.0
+        return longitudes
 
     else:
-        # --- Простые модели: постоянные a₀, e₀ ---
-        period = p['period']
-        e0 = p['e']
-        varpi0 = np.radians(p['varpi0'])
-        n = 2 * np.pi / period
-
-        domega = precession_deg_per_day(model, p['a'], e0)
-
-        lon_0, _ = real_helio_long(name, start_date)
-        nu_0 = (np.radians(lon_0) - varpi0 + np.pi) % (2 * np.pi) - np.pi
-        M_0 = true_to_mean_anomaly(nu_0, e0)
-
-        M = M_0 + n * day
-        varpi = varpi0 + np.radians(domega) * day
-        lon = np.degrees(varpi + true_anomaly(M, e0)) % 360.0
-        return lon
+        # --- Постоянные модели: domega = const, domega*day точно ---
+        longitudes = np.zeros(len(days_arr))
+        for i, day in enumerate(days_arr):
+            longitudes[i] = compute_model_long(name, model, start_date, int(day))
+        return longitudes
 
 # ============================================================
 # КООРДИНАТЫ СВАРОЖЬЕГО КРУГА
@@ -401,7 +487,7 @@ def print_contribution_table():
 # ============================================================
 # ПРЯМОЕ СРАВНЕНИЕ СКОРОСТЕЙ ПРЕЦЕССИИ
 # ============================================================
-def run_precession_comparison(years=1980, step_days=30):
+def run_precession_comparison(years=1980, step_days=30, vsop_data=None):
     start_dt = datetime(1010, 1, 1, 12, 0, 0)
     total_days = int(years * 365.25)
     days = np.arange(0, total_days + 1, step_days)
@@ -411,7 +497,7 @@ def run_precession_comparison(years=1980, step_days=30):
 
     results = {}
     for name in ['Mercury', 'Mars']:
-        print(f"\n  Сбор dϖ/dt для {name}...")
+        print(f"\n  Сбор d\u03c0/dt для {name}...")
         varpi_arr = []
         e_arr = []
         a_arr = []
@@ -442,12 +528,11 @@ def run_precession_comparison(years=1980, step_days=30):
                 varpi_unwrapped[i] += 360
 
         # --- Секулярная скорость через линейную регрессию ---
-        # Вместо np.gradient — наклон прямой: varpi(t) = C0 + C1*t + periodic
         coef = np.polyfit(years_arr, varpi_unwrapped, 1)
         secular_rate_deg_per_year = coef[0]
         secular_prec = secular_rate_deg_per_year * 3600 * 100  # arcsec/century
 
-        # --- Мгновенная скорость (для сравнения) ---
+        # --- Мгновенная скорость (dvarpi/dt, содержит короткопериодические колебания) ---
         step_years = step_days / 365.25
         dvarpi = np.gradient(varpi_unwrapped, step_years)
         prec_obs_instant = dvarpi * 3600 * 100  # arcsec/century
@@ -483,14 +568,14 @@ def run_precession_comparison(years=1980, step_days=30):
             'e': e_arr,
             'a': a_arr,
             'varpi': varpi_unwrapped,
-            # Полная скорость из DE422 (мгновенная)
+            # Полная мгновенная скорость из DE422 (содержит короткопериодические колебания)
             'prec_obs': prec_obs_instant,
-            # Секулярная скорость (регрессия)
+            # Секулярная скорость (наклон линейной регрессии за весь интервал)
             'secular_prec': secular_prec,
             # Опубликованный Newtonian
             'newtonian_planetary':
                 np.full(len(days), newtonian_val),
-            # Остаток после Newtonian
+            # Остаток после Newtonian (мгновенный)
             'residual_after_newtonian': newtonian_residual_arr,
             # Теоретические модели
             'prec_models': prec_models,
@@ -505,32 +590,44 @@ def run_precession_comparison(years=1980, step_days=30):
 # ============================================================
 # ДЛИННЫЙ РАСЧЁТ (долготы)
 # ============================================================
-def run_long_comparison(years=1980, step_days=30):
+def run_long_comparison(years=1980, step_days=30, vsop_data=None):
     start_dt = datetime(1010, 1, 1, 12, 0, 0)
     total_days = int(years * 365.25)
-    days = np.arange(1, total_days + 1, step_days)
+    # Включаем день 0 для корректного интегрирования
+    days_full = np.arange(0, total_days + 1, step_days)
+    days = days_full[1:]  # для ошибок: пропускаем день 0
 
-    MODELS = ['GR_obs', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
+    MODELS = ['DE422_minus_VSOP', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
     MODEL_LABELS = {
-        'GR_obs':      'GR (DE422\u2212VSOP87)',
-        'P0':          'P\u2080 (без e-поправки)',
-        'P_GR':        'P_GR (1/(1\u2212e\u00b2))',
-        'P_391838':    'P_A391838 (e\u2080)',
-        'P_391838_et': 'P_A391838 (a(t),e(t))',
+        'DE422_minus_VSOP': 'DE422 \u2212 VSOP87E (диагн.)',
+        'P0':               'P\u2080 (без e-поправки)',
+        'P_GR':             'P_GR (1/(1\u2212e\u00b2))',
+        'P_391838':         'P_A391838 (e\u2080)',
+        'P_391838_et':      'P_A391838 (a(t),e(t))',
     }
 
     results = {}
     for name in ['Mercury', 'Mars']:
         print(f"\n  Расчёт {name} на {years} лет (1010\u2013{1010+years})...")
         results[name] = {}
+
+        # Предвычисляем реальные долготы для всех дней (включая 0)
+        lon_real_arr = np.zeros(len(days_full))
+        for i, day in enumerate(days_full):
+            dt = start_dt + timedelta(days=int(day))
+            lon_real_arr[i], _ = real_helio_long(name, dt)
+
         for model in MODELS:
+            # Вычисляем модельные долготы для всех дней (включая 0)
+            lon_model_arr = compute_model_long_array(
+                name, model, start_dt, days_full, vsop_data
+            )
+
+            # Ошибки: пропускаем день 0
             errors = []
-            for i, day in enumerate(days):
-                dt = start_dt + timedelta(days=int(day))
-                lon_model = compute_model_long(name, model, start_dt, int(day))
-                lon_real, _ = real_helio_long(name, dt)
-                d = (lon_model - lon_real + 180) % 360 - 180
-                if i > 0:
+            for i in range(1, len(days_full)):
+                d = (lon_model_arr[i] - lon_real_arr[i] + 180) % 360 - 180
+                if i > 1:
                     while d - errors[-1] > 180: d -= 360
                     while d - errors[-1] < -180: d += 360
                 errors.append(d)
@@ -539,7 +636,9 @@ def run_long_comparison(years=1980, step_days=30):
     return days, results, MODEL_LABELS, MODELS
 
 
-
+# ============================================================
+# VSOP87E: ПАРСИНГ
+# ============================================================
 def parse_vsop87e(filename):
     series = {1: [], 2: [], 3: [], 4: [], 5: [], 6: []}  # a, lambda, h, k, p, q
     
@@ -548,7 +647,6 @@ def parse_vsop87e(filename):
     
     with open(filename, 'r', encoding='latin1') as f:
         for line in f:
-            # Отслеживаем заголовки секций (переменная и степень T)
             if 'VARIABLE' in line and '*T**' in line:
                 parts = line.split()
                 try:
@@ -561,11 +659,9 @@ def parse_vsop87e(filename):
                     continue
                 continue
             
-            # Парсим строки данных
             parts = line.split()
             if len(parts) >= 5 and current_var in series:
                 try:
-                    # В файлах VSOP87E значения A, B, C всегда идут последними тремя столбцами в строке
                     A = float(parts[-3])
                     B = float(parts[-2])
                     C = float(parts[-1])
@@ -574,19 +670,16 @@ def parse_vsop87e(filename):
                 except ValueError:
                     continue
 
-    # Проверка выгрузки h (3) и k (4)
     if len(series[3]) < 5 or len(series[4]) < 5:
         raise ValueError(f"Не удалось извлечь достаточное количество членов рядов h и k из {filename}")
         
     return series
 
 
-
 # ============================================================
 # VSOP87E: ВЫЧИСЛЕНИЕ ϖ, e, dϖ/dt
 # ============================================================
 def vsop87e_compute(series, t_mill):
-    # Вычисление k(t) и h(t)
     k = 0.0
     for power, A, B, C in series[3]:
         k += A * t_mill**power * np.cos(B + C * t_mill)
@@ -595,14 +688,11 @@ def vsop87e_compute(series, t_mill):
     for power, A, B, C in series[4]:
         h += A * t_mill**power * np.cos(B + C * t_mill)
         
-    # Вычисление эксцентриситета
     e = np.sqrt(h**2 + k**2)
     
-    # Вычисление перигелия
     varpi = np.arctan2(h, k)
     varpi_deg = np.degrees(varpi) % 360.0
     
-    # Вычисление производных
     dk = 0.0
     for power, A, B, C in series[3]:
         if power > 0:
@@ -615,7 +705,6 @@ def vsop87e_compute(series, t_mill):
             dh += A * power * t_mill**(power - 1) * np.cos(B + C * t_mill)
         dh += A * t_mill**power * (-C) * np.sin(B + C * t_mill)
         
-    # Вычисление скорости изменения перигелия
     e2 = h**2 + k**2
     if e2 < 1e-30:
         dvarpi = 0.0
@@ -633,7 +722,8 @@ def vsop87e_compute(series, t_mill):
 def datetime_to_vsop87_t(dt):
     t = ts.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
     jd = t.tt
-    return (jd - 2451545.0) / 365250.0  # перевод в юлианские тысячелетия
+    return (jd - 2451545.0) / 365250.0
+
 
 # ============================================================
 # MAIN
@@ -646,20 +736,6 @@ if __name__ == '__main__':
         filename = download_vsop87e(name)
         if filename:
             vsop_data[name] = parse_vsop87e(filename)
-    
-    # Добавляем вычисление GR-компоненты
-    def compute_gr_component(name, dt):
-        t_mill = datetime_to_vsop87_t(dt)
-        varpi_vsop, e_vsop, dvarpi_vsop = vsop87e_compute(vsop_data[name], t_mill)
-        
-        # Получаем DE422 данные
-        a_osc, e_osc, varpi_de422, _ = osculating_full(name, dt)
-        
-        # Вычисляем GR-сигнал
-        gr_signal = precession_arcsec_per_century('P_391838', a_osc, e_osc) - dvarpi_vsop
-        return gr_signal
-
-##############################################
 
     print_structure()
     print_contribution_table()
@@ -671,20 +747,32 @@ if __name__ == '__main__':
 
     start_dt = datetime(2026, 9, 16, 1, 0, 0)
     NUM_DAYS = 81
-    MODELS = ['GR_obs', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
+    MODELS = ['DE422_minus_VSOP', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
+
+    # Массив дней: 0..81 (включаем 0 для интегрирования)
+    days_test_full = np.arange(0, NUM_DAYS + 1)
+    days_test = days_test_full[1:]  # 1..81
 
     for name in ['Mercury', 'Venus', 'Earth', 'Mars']:
         print(f"\n  {name}:")
+
+        # Реальные долготы (включая день 0)
+        lon_real_test = np.zeros(len(days_test_full))
+        for i, day in enumerate(days_test_full):
+            dt = start_dt + timedelta(days=int(day))
+            lon_real_test[i], _ = real_helio_long(name, dt)
+
         for model in MODELS:
+            lon_models = compute_model_long_array(
+                name, model, start_dt, days_test_full, vsop_data
+            )
+            # Ошибки: дни 1..81
             rms_list = []
-            for day in range(1, NUM_DAYS + 1):
-                dt = start_dt + timedelta(days=day)
-                lon_model = compute_model_long(name, model, start_dt, day)
-                lon_real, _ = real_helio_long(name, dt)
-                d = (lon_model - lon_real + 180) % 360 - 180
+            for i in range(1, len(days_test_full)):
+                d = (lon_models[i] - lon_real_test[i] + 180) % 360 - 180
                 rms_list.append(d**2)
             rms = np.sqrt(np.mean(rms_list))
-            print(f"    {model:15s}  RMS = {rms:.6f}\u00b0")
+            print(f"    {model:20s}  RMS = {rms:.6f}\u00b0")
 
     # --- Чертоги ---
     print(f"\n{'='*80}")
@@ -706,6 +794,7 @@ if __name__ == '__main__':
     # --- Оскулирующие элементы ---
     print(f"\n{'='*80}")
     print("Оскулирующие элементы для Меркурия (проверка)")
+    print("  (Sun-only оскулирующие элементы из DE422 state vector)")
     print(f"{'='*80}")
     for day in [0, 20, 40, 60, 80]:
         dt = datetime(2026, 9, 16) + timedelta(days=day)
@@ -714,70 +803,40 @@ if __name__ == '__main__':
               f"\u03c0={varpi:.4f}\u00b0  M={np.degrees(M):.4f}\u00b0")
 
     # --- Прямое сравнение скоростей прецессии ---
-    # ============================================================
-    # ВЫВОД ТАБЛИЦЫ ПРЕЦЕССИИ
-    # ============================================================
     print(f"\n{'='*80}")
     print("Прямое сравнение d\u03c0/dt (1980 лет, шаг 30 дней)")
     print(f"{'='*80}")
 
-#    prec_results = run_precession_comparison(years=1980, step_days=30)
-
     try:
-        # Основной код
-        # run_precession_comparison()
-        prec_results = run_precession_comparison(years=1980, step_days=30)
+        prec_results = run_precession_comparison(years=1980, step_days=30, vsop_data=vsop_data)
     except Exception as e:
         print(f"Произошла ошибка: {e}")
+        import traceback; traceback.print_exc()
+        prec_results = None
 
-    for name in ['Mercury', 'Mars']:
-# === ВСТАВЛЯТЬ СЮДА ===
-#        gr_comp = prec_results[name]['gr_component']
-#        print(f"Средний GR-компонент ({name}): {np.mean(gr_comp):.4f} arcsec/century")
-        r = prec_results[name]
-#        obs = r['prec_obs']
-        secular = r['secular_prec']
-        newtonian = NEWTONIAN_PLANETARY[name]
-        residual_secular = secular - newtonian
+    if prec_results is not None:
+        for name in ['Mercury', 'Mars']:
+            r = prec_results[name]
+            secular = r['secular_prec']
+            newtonian = NEWTONIAN_PLANETARY[name]
+            residual_secular = secular - newtonian
 
+            print(f"\n  {name}:")
+            print(f"             {'Модель':>25s}  {'Среднее':>20s}  {'Секулярная':>20s}")
+            print(f"  {'-'*70}")
+            print(f"  {'DE422 мгновенная (d\u03c0/dt)':>25s}  {np.mean(r['prec_obs']):>20.4f}  {secular:>20.4f}")
+            print(f"  {'Newtonian (опубл.)':>25s}  {newtonian:>20.4f}  {newtonian:>20.4f}")
+            print(f"  {'Residual (DE422\u2212Newt.)':>25s}  {np.mean(r['residual_after_newtonian']):>20.4f}  {residual_secular:>20.4f}")
+            print(f"  {'DE422\u2212VSOP87E (диагн.)':>25s}  {np.mean(r['vsop_difference']):>20.4f}  {'\u2014':>20s}")
+            print()
 
-#        print(f"\n  {name}:")
-#        print(f"    {'Модель':>15}  {'Среднее (arcsec/век)':>20}  "
-#              f"{'Ошибка':>12}  {'RMS остатка':>12}")
-#        print(f"    {'-'*15}  {'-'*20}  {'-'*12}  {'-'*12}")
-#        print(f"    {'Наблюдение':>15}  {np.mean(obs):20.4f}  {'—':>12}  {'—':>12}")
+            for model in ['P0', 'P_GR', 'P_391838', 'P_391838_et']:
+                val = np.mean(r['prec_models'][model])
+                print(f"  {model:>25s}  {val:>20.4f}")
 
-        print(f"\n  {name}:")
-        print(f"             {'Модель':>20s}  {'Среднее':>20s}  {'Секулярная':>20s}")
-        print(f"  {'-'*65}")
-        print(f"  {'DE422 total (мгновенная)':>20s}  {np.mean(r['prec_obs']):>20.4f}  {secular:>20.4f}")
-        print(f"  {'Newtonian (опубл.)':>20s}  {newtonian:>20.4f}  {newtonian:>20.4f}")
-        print(f"  {'Residual (DE422−Newt.)':>20s}  {np.mean(r['residual_after_newtonian']):>20.4f}  {residual_secular:>20.4f}")
-        print(f"  {'DE422−VSOP87E (диагн.)':>20s}  {np.mean(r['vsop_difference']):>20.4f}  {'—':>20s}")
-        print()
-
-  #      for model in MODELS:
-  #          mod = r['prec_models'][model]
-  #          mean_mod = np.mean(mod)
-  #          err = np.mean(obs) - mean_mod
-  #          rms = np.sqrt(np.mean((obs - mod)**2))
-  #          print(f"    {model:>15}  {mean_mod:20.4f}  {err:+12.4f}  {rms:12.4f}")
-        for model in ['P0', 'P_GR', 'P_391838', 'P_391838_et']:
-            val = np.mean(r['prec_models'][model])
-            print(f"  {model:>20s}  {val:>20.4f}")
-
-        # Отношение RMS
-#        rms_gr = np.sqrt(np.mean((obs - r['prec_models']['P_GR'])**2))
-#        rms_a39 = np.sqrt(np.mean((obs - r['prec_models']['P_391838'])**2))
-#        rms_a39et = np.sqrt(np.mean((obs - r['prec_models']['P_391838_et'])**2))
-#        print(f"\n    RMS(A391838_e0) / RMS(GR)     = {rms_a39/rms_gr:.4f}")
-#        print(f"    RMS(A391838_et) / RMS(GR)     = {rms_a39et/rms_gr:.4f}")
-
-        print()
-        print(f"  Секулярный остаток vs GR:     {residual_secular:.4f} vs {np.mean(r['prec_models']['P_GR']):.4f}")
-        print(f"  Секулярный остаток vs A391838: {residual_secular:.4f} vs {np.mean(r['prec_models']['P_391838']):.4f}")
-
-
+            print()
+            print(f"  Секулярный остаток vs GR:      {residual_secular:.4f} vs {np.mean(r['prec_models']['P_GR']):.4f}")
+            print(f"  Секулярный остаток vs A391838: {residual_secular:.4f} vs {np.mean(r['prec_models']['P_391838']):.4f}")
 
     # --- Длинный расчёт долготы ---
     print(f"\n{'='*80}")
@@ -785,16 +844,16 @@ if __name__ == '__main__':
     print(f"{'='*80}")
 
     days_arr, long_results, model_labels, model_list = run_long_comparison(
-        years=1980, step_days=30)
+        years=1980, step_days=30, vsop_data=vsop_data)
 
     # --- График 1: расхождение с эфемеридой ---
     fig1, axes1 = plt.subplots(1, 2, figsize=(18, 8))
     colors = {
-        'GR_obs':      '#9b59b6',
-        'P0':          '#95a5a6',
-        'P_GR':        '#3498db',
-        'P_391838':    '#e74c3c',
-        'P_391838_et': '#2ecc71',
+        'DE422_minus_VSOP': '#9b59b6',
+        'P0':               '#95a5a6',
+        'P_GR':             '#3498db',
+        'P_391838':         '#e74c3c',
+        'P_391838_et':      '#2ecc71',
     }
 
     for idx, name in enumerate(['Mercury', 'Mars']):
@@ -859,61 +918,62 @@ if __name__ == '__main__':
     plt.show()
 
     # --- График 3: dϖ/dt — наблюдение vs модели ---
-    fig3, axes3 = plt.subplots(2, 1, figsize=(18, 10))
-    for idx, name in enumerate(['Mercury', 'Mars']):
-        ax = axes3[idx]
-        r = prec_results[name]
-        yrs = r['years']
+    if prec_results is not None:
+        fig3, axes3 = plt.subplots(2, 1, figsize=(18, 10))
+        for idx, name in enumerate(['Mercury', 'Mars']):
+            ax = axes3[idx]
+            r = prec_results[name]
+            yrs = r['years']
 
-        ax.plot(yrs, r['prec_obs'], 'k-', lw=0.3, alpha=0.3,
-                label='\u041d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435 (d\u03c0/dt)')
-        for model in ['P0', 'P_GR', 'P_391838', 'P_391838_et']:
-            ax.plot(yrs, r['prec_models'][model], lw=0.8, alpha=0.8,
-                    color=colors[model], label=model_labels[model])
-        ax.set_title(f'{name}: \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c '
-                     '\u043f\u0440\u0435\u0446\u0435\u0441\u0441\u0438\u0438 '
-                     '(arcsec/\u0432\u0435\u043a)',
-                     fontweight='bold', fontsize=13)
-        ax.set_xlabel('\u0413\u043e\u0434\u044b \u043e\u0442 1010 \u0433.')
-        ax.set_ylabel('arcsec/\u0432\u0435\u043a')
-        ax.legend(fontsize=8)
-        ax.grid(True, alpha=0.2)
+            ax.plot(yrs, r['prec_obs'], 'k-', lw=0.3, alpha=0.3,
+                    label='DE422 \u043c\u0433\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f (d\u03c0/dt, \u043e\u0441\u043a\u0443\u043b\u0438\u0440\u0443\u044e\u0449\u0430\u044f)')
+            for model in ['P0', 'P_GR', 'P_391838', 'P_391838_et']:
+                ax.plot(yrs, r['prec_models'][model], lw=0.8, alpha=0.8,
+                        color=colors[model], label=model_labels[model])
+            ax.set_title(f'{name}: \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c '
+                         '\u043f\u0440\u0435\u0446\u0435\u0441\u0441\u0438\u0438 '
+                         '(arcsec/\u0432\u0435\u043a)',
+                         fontweight='bold', fontsize=13)
+            ax.set_xlabel('\u0413\u043e\u0434\u044b \u043e\u0442 1010 \u0433.')
+            ax.set_ylabel('arcsec/\u0432\u0435\u043a')
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.2)
 
-    fig3.suptitle(
-        '\u041d\u0430\u0431\u043b\u044e\u0434\u0430\u0435\u043c\u0430\u044f '
-        '\u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c \u043f\u0440\u0435\u0446\u0435\u0441\u0441\u0438\u0438 '
-        'vs \u043c\u043e\u0434\u0435\u043b\u0438',
-        fontsize=14, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig('precession_rate_comparison.png', dpi=150, bbox_inches='tight')
-    plt.show()
+        fig3.suptitle(
+            '\u041d\u0430\u0431\u043b\u044e\u0434\u0430\u0435\u043c\u0430\u044f '
+            '\u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c \u043f\u0440\u0435\u0446\u0435\u0441\u0441\u0438\u0438 '
+            'vs \u043c\u043e\u0434\u0435\u043b\u0438',
+            fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig('precession_rate_comparison.png', dpi=150, bbox_inches='tight')
+        plt.show()
 
-    # --- График 4: a(t) и e(t) ---
-    fig4, axes4 = plt.subplots(2, 2, figsize=(18, 10))
-    for idx, name in enumerate(['Mercury', 'Mars']):
-        r = prec_results[name]
-        yrs = r['years']
+        # --- График 4: a(t) и e(t) ---
+        fig4, axes4 = plt.subplots(2, 2, figsize=(18, 10))
+        for idx, name in enumerate(['Mercury', 'Mars']):
+            r = prec_results[name]
+            yrs = r['years']
 
-        ax_e = axes4[0][idx]
-        ax_e.plot(yrs, r['e'], 'b-', lw=0.3, alpha=0.5)
-        ax_e.set_title(f'{name}: e(t)', fontweight='bold')
-        ax_e.set_xlabel('\u0413\u043e\u0434\u044b')
-        ax_e.set_ylabel('e')
-        ax_e.grid(True, alpha=0.2)
+            ax_e = axes4[0][idx]
+            ax_e.plot(yrs, r['e'], 'b-', lw=0.3, alpha=0.5)
+            ax_e.set_title(f'{name}: e(t)', fontweight='bold')
+            ax_e.set_xlabel('\u0413\u043e\u0434\u044b')
+            ax_e.set_ylabel('e')
+            ax_e.grid(True, alpha=0.2)
 
-        ax_a = axes4[1][idx]
-        ax_a.plot(yrs, r['a'], 'r-', lw=0.3, alpha=0.5)
-        ax_a.set_title(f'{name}: a(t)', fontweight='bold')
-        ax_a.set_xlabel('\u0413\u043e\u0434\u044b')
-        ax_a.set_ylabel('a (\u0430.\u0435.)')
-        ax_a.grid(True, alpha=0.2)
+            ax_a = axes4[1][idx]
+            ax_a.plot(yrs, r['a'], 'r-', lw=0.3, alpha=0.5)
+            ax_a.set_title(f'{name}: a(t)', fontweight='bold')
+            ax_a.set_xlabel('\u0413\u043e\u0434\u044b')
+            ax_a.set_ylabel('a (\u0430.\u0435.)')
+            ax_a.grid(True, alpha=0.2)
 
-    fig4.suptitle('\u041e\u0441\u043a\u0443\u043b\u0438\u0440\u0443\u044e\u0449\u0438\u0435 '
-                  '\u044d\u043b\u0435\u043c\u0435\u043d\u0442\u044b (DE422)',
-                  fontsize=14, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig('osculating_elements.png', dpi=150, bbox_inches='tight')
-    plt.show()
+        fig4.suptitle('\u041e\u0441\u043a\u0443\u043b\u0438\u0440\u0443\u044e\u0449\u0438\u0435 '
+                      '\u044d\u043b\u0435\u043c\u0435\u043d\u0442\u044b (DE422, Sun-only)',
+                      fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig('osculating_elements.png', dpi=150, bbox_inches='tight')
+        plt.show()
 
     # --- График 5: долгота ---
     fig5, ax5 = plt.subplots(1, 1, figsize=(16, 6))
@@ -940,49 +1000,52 @@ if __name__ == '__main__':
     # ============================================================
     # ГРАФИК: БЮДЖЕТ ПРЕЦЕССИИ
     # ============================================================
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    if prec_results is not None:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 7))
 
-    for idx, name in enumerate(['Mercury', 'Mars']):
-        ax = axes[idx]
-        r = prec_results[name]
-        yrs = r['years']
+        for idx, name in enumerate(['Mercury', 'Mars']):
+            ax = axes[idx]
+            r = prec_results[name]
+            yrs = r['years']
 
-        # Полная прецессия из DE422 (затухающая alpha)
-        ax.plot(yrs, r['prec_obs'], 'k-', lw=0.3, alpha=0.25,
-                label='DE422 total (мгновенная)')
+            # Полная мгновенная прецессия из DE422
+            ax.plot(yrs, r['prec_obs'], 'k-', lw=0.3, alpha=0.25,
+                    label='DE422 \u043c\u0433\u043d\u043e\u0432\u0435\u043d\u043d\u0430\u044f')
 
-        # Newtonian planetary (горизонтальная линия)
-        ax.axhline(NEWTONIAN_PLANETARY[name], color='gray', ls='--',
-                   lw=1.5, label='Newtonian (опубл.)')
+            # Newtonian planetary
+            if name == 'Mars':
+                ax.axhline(NEWTONIAN_PLANETARY[name], color='gray', ls='--',
+                           lw=1.5, label='Newtonian (\u043e\u0440\u0438\u0435\u043d\u0442.)')
+            else:
+                ax.axhline(NEWTONIAN_PLANETARY[name], color='gray', ls='--',
+                           lw=1.5, label='Newtonian (\u043e\u043f\u0443\u0431\u043b.)')
 
-        # Residual после Newtonian
-        ax.plot(yrs, r['residual_after_newtonian'], color='red',
-                lw=0.8, alpha=0.5, label='DE422 − Newtonian')
+            # Residual после Newtonian
+            ax.plot(yrs, r['residual_after_newtonian'], color='red',
+                    lw=0.8, alpha=0.5, label='DE422 \u2212 Newtonian')
 
-        # GR теория
-        ax.plot(yrs, r['prec_models']['P_GR'], color='blue',
-                lw=1.5, label='P_GR (теория)')
+            # GR теория
+            ax.plot(yrs, r['prec_models']['P_GR'], color='blue',
+                    lw=1.5, label='P_GR (\u0442\u0435\u043e\u0440\u0438\u044f)')
 
-        # A391838 теория
-        ax.plot(yrs, r['prec_models']['P_391838'], color='green',
-                lw=1.5, label='P_391838 (теория)')
+            # A391838 теория
+            ax.plot(yrs, r['prec_models']['P_391838'], color='green',
+                    lw=1.5, label='P_391838 (\u0442\u0435\u043e\u0440\u0438\u044f)')
 
-        # Секулярная скорость (регрессия)
-        ax.axhline(r['secular_prec'], color='black', ls=':',
-                   lw=1, label=f'Секулярная: {r["secular_prec"]:.2f}')
+            # Секулярная скорость (регрессия)
+            ax.axhline(r['secular_prec'], color='black', ls=':',
+                       lw=1, label=f'\u0421\u0435\u043a\u0443\u043b\u044f\u0440\u043d\u0430\u044f: {r["secular_prec"]:.2f}')
 
-        ax.set_title(name, fontsize=13)
-        ax.set_xlabel('Годы от 1010 г.')
-        ax.set_ylabel('arcsec / век')
-        ax.grid(True, alpha=0.2)
-        ax.legend(fontsize=8, loc='upper right')
+            ax.set_title(name, fontsize=13)
+            ax.set_xlabel('\u0413\u043e\u0434\u044b \u043e\u0442 1010 \u0433.')
+            ax.set_ylabel('arcsec / \u0432\u0435\u043a')
+            ax.grid(True, alpha=0.2)
+            ax.legend(fontsize=8, loc='upper right')
 
-    plt.tight_layout()
-    plt.savefig('newtonian_residual_vs_gr.png', dpi=150, bbox_inches='tight')
-    plt.close()
-    print("  newtonian_residual_vs_gr.png")
-
-
+        plt.tight_layout()
+        plt.savefig('newtonian_residual_vs_gr.png', dpi=150, bbox_inches='tight')
+        plt.close()
+        print("  newtonian_residual_vs_gr.png")
 
     print(f"\n{'='*80}")
     print("\u0413\u0440\u0430\u0444\u0438\u043a\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b:")
