@@ -1,6 +1,6 @@
 """
-Спектральный анализ e(t) и прецессии — версия 2.
-Усреднение по орбитальному периоду перед FFT.
+Спектральный анализ e(t) и прецессии — версия 3.
+Добавлено: сравнение средних скоростей прецессии за тысячелетие.
 """
 
 import numpy as np
@@ -37,7 +37,6 @@ L = 0.6496
 # ОСКУЛИРУЮЩИЕ ЭЛЕМЕНТЫ + ДОЛГОТА ПЕРИГЕЛИЯ
 # ============================================================
 def osculating_full(name, dt):
-    """Возвращает (a_osc, e_osc, varpi_deg) — все из вектора эксцентриситета."""
     t = ts.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
     body = BODIES[name]
     sun_at = SUN.at(t)
@@ -60,26 +59,23 @@ def osculating_full(name, dt):
 
     e_vec = np.cross(v_vec, h_vec) / mu - r_vec / r
     e_osc = np.sqrt(np.sum(e_vec**2))
-
-    # Долгота перигелия — направление e_vec в эклиптической плоскости
     varpi_deg = np.degrees(np.arctan2(e_vec[1], e_vec[0])) % 360.0
 
     return a_osc, min(max(e_osc, 0.0), 0.99), varpi_deg
 
 # ============================================================
-# СБОР ДАННЫХ — частый шаг для усреднения
+# СБОР ДАННЫХ
 # ============================================================
 print("Сбор данных: 1980 лет, шаг 5 дней...")
 
 start_dt = datetime(1010, 1, 1, 12, 0, 0)
-step_raw = 5           # дней между точками
+step_raw = 5
 total_days = int(1980 * 365.25)
 sample_raw = np.arange(0, total_days, step_raw)
 
-# Окно сглаживания: ~2 орбитальных периода
 WINDOWS = {
-    'Mercury': int(2 * 87.969 / step_raw),   # ~35 точек = 175 дней
-    'Mars':    int(2 * 686.98 / step_raw),    # ~275 точек = 1375 дней
+    'Mercury': int(2 * 87.969 / step_raw),
+    'Mars':    int(2 * 686.98 / step_raw),
 }
 
 data = {}
@@ -98,12 +94,10 @@ for name in ['Mercury', 'Mars']:
     e_raw = np.array(e_raw)
     varpi_raw = np.array(varpi_raw)
 
-    # Сглаживание скользящим средним
     win = WINDOWS[name]
     kernel = np.ones(win) / win
     e_smooth = np.convolve(e_raw, kernel, mode='valid')
 
-    # Для долготы перигелия:unwrap + сглаживание + производная
     varpi_unwrapped = np.copy(varpi_raw)
     for i in range(1, len(varpi_unwrapped)):
         while varpi_unwrapped[i] - varpi_unwrapped[i-1] > 180:
@@ -112,21 +106,12 @@ for name in ['Mercury', 'Mars']:
             varpi_unwrapped[i] += 360
     varpi_smooth = np.convolve(varpi_unwrapped, kernel, mode='valid')
 
-    # Производная: dϖ/dt через центральную разность
-    # Шаг в годах
     step_years = step_raw / 365.25
-    n_smooth = len(varpi_smooth)
-    prec_obs = np.gradient(varpi_smooth, step_years)  # град/год
-    prec_obs = prec_obs * 3600  # → arcsec/год
-    # Но прецессия — это dϖ/dt, а не град/год полной долготы
-    # Нужна скорость относительно равномерного движения
-    # Проще: prec_obs уже = d(ϖ)/dt в arcsec/год
+    prec_obs = np.gradient(varpi_smooth, step_years) * 3600  # arcsec/год
 
-    # Модельные скорости со сглаженным e
     prec_gr = K / (a**2.5 * (1 - e_smooth**2))
     prec_a39 = (K + L * (A391838_truncated(e_smooth) - 1)) / a**2.5
 
-    # Время для сглаженных рядов (коррекция на convolve 'valid')
     years_smooth = (sample_raw[:len(e_smooth)] + win * step_raw / 2) / 365.25
 
     data[name] = {
@@ -138,7 +123,7 @@ for name in ['Mercury', 'Mars']:
     }
 
 # ============================================================
-# FFT (с защитой от деления на ноль)
+# FFT
 # ============================================================
 def compute_spectrum(signal, step_days):
     n = len(signal)
@@ -147,7 +132,6 @@ def compute_spectrum(signal, step_days):
     signal_windowed = signal_detrend * window
     fft = np.fft.rfft(signal_windowed)
     freqs = np.fft.rfftfreq(n, d=step_days)
-    # Защита от freqs=0
     periods_years = np.where(freqs > 0, 1.0 / (freqs * 365.25), np.inf)
     amplitudes = np.abs(fft) * 2 / n
     return periods_years, amplitudes
@@ -170,7 +154,6 @@ KNOWN_PERIODS = {
     ],
 }
 
-# Делители × базовый цикл
 DIVISOR_PERIODS = {
     16: '16 лет',
     32: '16×2',
@@ -183,10 +166,81 @@ DIVISOR_PERIODS = {
 }
 
 # ============================================================
+# ГЛАВНОЕ: СРАВНЕНИЕ СРЕДНИХ СКОРОСТЕЙ
+# ============================================================
+print(f"\n{'='*80}")
+print("Сравнение средних скоростей прецессии за 1980 лет (1010–2990)")
+print(f"{'='*80}")
+
+for name in ['Mercury', 'Mars']:
+    obs = data[name]['prec_obs']
+    gr = data[name]['prec_gr']
+    a39 = data[name]['prec_a39']
+
+    mean_obs = np.mean(obs)
+    mean_gr = np.mean(gr)
+    mean_a39 = np.mean(a39)
+
+    # RMS остатка
+    rms_gr = np.sqrt(np.mean((obs - gr)**2))
+    rms_a39 = np.sqrt(np.mean((obs - a39)**2))
+
+    # Также P0
+    a = PLANETS[name]['a']
+    prec_p0 = np.full_like(obs, K / a**2.5)
+    mean_p0 = np.mean(prec_p0)
+    rms_p0 = np.sqrt(np.mean((obs - prec_p0)**2))
+
+    print(f"\n  {name}:")
+    print(f"    {'Модель':>15}  {'Среднее':>10}  {'Ошибка':>10}  {'RMS остатка':>12}")
+    print(f"    {'-'*15}  {'-'*10}  {'-'*10}  {'-'*12}")
+    print(f"    {'Наблюдение':>15}  {mean_obs:10.4f}  {'—':>10}  {'—':>12}")
+    print(f"    {'P0':>15}  {mean_p0:10.4f}  {mean_obs - mean_p0:+10.4f}  {rms_p0:12.4f}")
+    print(f"    {'P_GR':>15}  {mean_gr:10.4f}  {mean_obs - mean_gr:+10.4f}  {rms_gr:12.4f}")
+    print(f"    {'P_A391838':>15}  {mean_a39:10.4f}  {mean_obs - mean_a39:+10.4f}  {rms_a39:12.4f}")
+
+    # Отношение
+    if rms_gr > 0:
+        ratio = rms_a39 / rms_gr
+        print(f"\n    RMS(A391838) / RMS(GR) = {ratio:.4f}")
+        if ratio < 1.0:
+            print(f"    → A391838 точнее на {(1-ratio)*100:.1f}%")
+        else:
+            print(f"    → GR точнее на {(ratio-1)*100:.1f}%")
+
+    # Разница между моделями
+    d_a39_gr = mean_a39 - mean_gr
+    print(f"\n    Разница средних (A391838 − GR) = {d_a39_gr:+.4f} arcsec/год")
+    print(f"    За 1980 лет: {d_a39_gr * 1980:+.2f} arcsec = {d_a39_gr * 1980 / 3600:+.4f}°")
+
+# ============================================================
+# Дополнительно: P0 и P_GR как константы
+# ============================================================
+print(f"\n{'='*80}")
+print("Сводка: средняя ошибка по моделям (arcsec/год)")
+print(f"{'='*80}")
+print(f"\n  {'Планета':>10}  {'P0 ошибка':>12}  {'GR ошибка':>12}  {'A391838 ошибка':>14}  {'A39/GR':>8}")
+print(f"  {'-'*10}  {'-'*12}  {'-'*12}  {'-'*14}  {'-'*8}")
+
+for name in ['Mercury', 'Mars']:
+    obs = data[name]['prec_obs']
+    a = PLANETS[name]['a']
+
+    mean_obs = np.mean(obs)
+    err_p0 = mean_obs - K / a**2.5
+    err_gr = mean_obs - np.mean(data[name]['prec_gr'])
+    err_a39 = mean_obs - np.mean(data[name]['prec_a39'])
+
+    ratio = np.sqrt(np.mean((obs - data[name]['prec_a39'])**2)) / \
+            np.sqrt(np.mean((obs - data[name]['prec_gr'])**2))
+
+    print(f"  {name:>10}  {err_p0:+12.4f}  {err_gr:+12.4f}  {err_a39:+14.4f}  {ratio:8.4f}")
+
+# ============================================================
 # ГРАФИКИ
 # ============================================================
 
-# --- График 1: e(t) сглаженный ---
+# --- График 1: e(t) ---
 fig1, axes1 = plt.subplots(2, 1, figsize=(18, 10))
 for idx, name in enumerate(['Mercury', 'Mars']):
     ax = axes1[idx]
@@ -194,15 +248,13 @@ for idx, name in enumerate(['Mercury', 'Mars']):
     e_mean = np.mean(data[name]['e'])
     ax.axhline(e_mean, color='r', ls='--', lw=0.8, alpha=0.5,
                label=f'среднее e = {e_mean:.6f}')
-    ax.set_title(f'{name}: оскулирующий e(t), сглаженный по ~2 периода',
-                 fontweight='bold', fontsize=13)
+    ax.set_title(f'{name}: оскулирующий e(t), сглаженный', fontweight='bold', fontsize=13)
     ax.set_xlabel('Годы от 1010 г.')
     ax.set_ylabel('e(t)')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.2)
 
-fig1.suptitle('Сглаженный эксцентриситет (NASA DE422, 1010–2990)',
-              fontsize=14, fontweight='bold')
+fig1.suptitle('Сглаженный эксцентриситет (NASA DE422, 1010–2990)', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('eccentricity_smoothed.png', dpi=150, bbox_inches='tight')
 plt.show()
@@ -212,38 +264,24 @@ fig2, axes2 = plt.subplots(2, 1, figsize=(18, 10))
 for idx, name in enumerate(['Mercury', 'Mars']):
     ax = axes2[idx]
     periods, amps = compute_spectrum(data[name]['e'], step_raw)
-
     mask = (periods > 10) & (periods < 5000)
     ax.plot(periods[mask], amps[mask], 'b-', lw=0.8)
-    ax.set_title(f'{name}: спектр e(t) после сглаживания',
-                 fontweight='bold', fontsize=13)
+    ax.set_title(f'{name}: спектр e(t)', fontweight='bold', fontsize=13)
     ax.set_xlabel('Период (годы)')
     ax.set_ylabel('Амплитуда')
     ax.set_xscale('log')
     ax.grid(True, alpha=0.2)
 
-    # Известные периоды
     for period, label in KNOWN_PERIODS[name]:
         ax.axvline(period, color='r', ls='--', lw=0.8, alpha=0.5)
         ax.text(period * 1.03, ax.get_ylim()[1] * 0.85, label,
                 fontsize=7, color='r', rotation=90, va='top')
 
-    # Делители Сварожьего Круга
     for p, lbl in DIVISOR_PERIODS.items():
         if 10 < p < 5000:
             ax.axvline(p, color='g', ls=':', lw=0.8, alpha=0.5)
 
-    # Топ-10 пиков
-    amps_m = amps[mask]
-    periods_m = periods[mask]
-    top = np.argsort(amps_m)[-10:][::-1]
-    print(f"\n  {name} — топ-10 периодов e(t):")
-    for i, ti in enumerate(top):
-        print(f"    {i+1:2d}. {periods_m[ti]:8.1f} лет  "
-              f"(амплитуда {amps_m[ti]:.8f})")
-
-fig2.suptitle('Спектр эксцентриситета (FFT, сглаженный)',
-              fontsize=14, fontweight='bold')
+fig2.suptitle('Спектр эксцентриситета (FFT)', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('spectrum_e_smoothed.png', dpi=150, bbox_inches='tight')
 plt.show()
@@ -254,25 +292,23 @@ for idx, name in enumerate(['Mercury', 'Mars']):
     ax = axes3[idx]
     yrs = data[name]['years']
     ax.plot(yrs, data[name]['prec_obs'], 'k-', lw=0.4, alpha=0.4,
-            label='Наблюдение (dϖ/dt)')
+            label='Наблюдение (d\u03c0/dt)')
     ax.plot(yrs, data[name]['prec_gr'], 'b-', lw=0.8, alpha=0.7,
             label='P_GR')
     ax.plot(yrs, data[name]['prec_a39'], 'r-', lw=0.8, alpha=0.7,
             label='P_A391838')
-    ax.set_title(f'{name}: скорость прецессии (arcsec/год)',
-                 fontweight='bold', fontsize=13)
+    ax.set_title(f'{name}: скорость прецессии (arcsec/год)', fontweight='bold', fontsize=13)
     ax.set_xlabel('Годы от 1010 г.')
     ax.set_ylabel('arcsec/год')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.2)
 
-fig3.suptitle('Скорость прецессии: наблюдение vs модели',
-              fontsize=14, fontweight='bold')
+fig3.suptitle('Скорость прецессии: наблюдение vs модели', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('precession_rate_smoothed.png', dpi=150, bbox_inches='tight')
 plt.show()
 
-# --- График 4: спектр остатка прецессии ---
+# --- График 4: спектр остатка ---
 fig4, axes4 = plt.subplots(2, 1, figsize=(18, 10))
 for idx, name in enumerate(['Mercury', 'Mars']):
     ax = axes4[idx]
@@ -284,12 +320,10 @@ for idx, name in enumerate(['Mercury', 'Mars']):
     _, amps_a39 = compute_spectrum(residual_a39, step_raw)
 
     mask = (periods > 10) & (periods < 5000)
-    ax.plot(periods[mask], amps_gr[mask], 'b-', lw=0.8,
-            label='Наблюдение − GR')
+    ax.plot(periods[mask], amps_gr[mask], 'b-', lw=0.8, label='Наблюдение \u2212 GR')
     ax.plot(periods[mask], amps_a39[mask], 'r-', lw=0.8, alpha=0.7,
-            label='Наблюдение − A391838')
-    ax.set_title(f'{name}: спектр остатка прецессии',
-                 fontweight='bold', fontsize=13)
+            label='Наблюдение \u2212 A391838')
+    ax.set_title(f'{name}: спектр остатка прецессии', fontweight='bold', fontsize=13)
     ax.set_xlabel('Период (годы)')
     ax.set_ylabel('Амплитуда')
     ax.set_xscale('log')
@@ -305,25 +339,7 @@ for idx, name in enumerate(['Mercury', 'Mars']):
         if 10 < p < 5000:
             ax.axvline(p, color='g', ls=':', lw=0.8, alpha=0.4)
 
-    # Топ-10 пиков остатка (набл − GR)
-    amps_m = amps_gr[mask]
-    periods_m = periods[mask]
-    top = np.argsort(amps_m)[-10:][::-1]
-    print(f"\n  {name} — топ-10 периодов (набл. − GR):")
-    for i, ti in enumerate(top):
-        print(f"    {i+1:2d}. {periods_m[ti]:8.1f} лет  "
-              f"(амплитуда {amps_m[ti]:.4f})")
-
-    # Топ-10 пиков остатка (набл − A391838)
-    amps_a = amps_a39[mask]
-    top_a = np.argsort(amps_a)[-10:][::-1]
-    print(f"\n  {name} — топ-10 периодов (набл. − A391838):")
-    for i, ti in enumerate(top_a):
-        print(f"    {i+1:2d}. {periods_m[ti]:8.1f} лет  "
-              f"(амплитуда {amps_a[ti]:.4f})")
-
-fig4.suptitle('Спектр остатка прецессии (FFT, сглаженный)',
-              fontsize=14, fontweight='bold')
+fig4.suptitle('Спектр остатка прецессии (FFT)', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('spectrum_residual_smoothed.png', dpi=150, bbox_inches='tight')
 plt.show()
@@ -348,15 +364,11 @@ for idx, name in enumerate(['Mercury', 'Mars']):
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.2)
 
-fig5.suptitle('Зависимость скорости прецессии от e(t)',
-              fontsize=14, fontweight='bold')
+fig5.suptitle('Зависимость скорости прецессии от e(t)', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('precession_vs_e_smoothed.png', dpi=150, bbox_inches='tight')
 plt.show()
 
-# ============================================================
-# ИТОГ
-# ============================================================
 print(f"\n{'='*80}")
 print("Графики сохранены:")
 print("  eccentricity_smoothed.png")
@@ -365,3 +377,4 @@ print("  precession_rate_smoothed.png")
 print("  spectrum_residual_smoothed.png")
 print("  precession_vs_e_smoothed.png")
 print(f"{'='*80}")
+
