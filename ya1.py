@@ -402,52 +402,38 @@ def print_contribution_table():
 # ПРЯМОЕ СРАВНЕНИЕ СКОРОСТЕЙ ПРЕЦЕССИИ
 # ============================================================
 def run_precession_comparison(years=1980, step_days=30):
-    """
-    Извлекает dϖ/dt из DE422 и сравнивает с моделями.
-    dϖ/dt вычисляется как производная долготы перигелия
-    (из вектора эксцентриситета) по времени.
-    """
     start_dt = datetime(1010, 1, 1, 12, 0, 0)
     total_days = int(years * 365.25)
     days = np.arange(0, total_days + 1, step_days)
+    years_arr = days / 365.25
 
-    MODELS = ['GR_obs', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
+    MODELS = ['Newtonian_residual', 'P0', 'P_GR', 'P_391838', 'P_391838_et']
 
     results = {}
     for name in ['Mercury', 'Mars']:
-        print(f"\n  Сбор d\u03c0/dt для {name}...")
+        print(f"\n  Сбор dϖ/dt для {name}...")
         varpi_arr = []
         e_arr = []
         a_arr = []
-#        gr_values = []  # Добавляем массив для GR-компонента
         dvarpi_vsop_arr = []
 
         for d in days:
             dt = start_dt + timedelta(days=int(d))
-
-            # Получаем оскулирующие элементы
             a_osc, e_osc, varpi, _ = osculating_full(name, dt)
             varpi_arr.append(varpi)
             e_arr.append(e_osc)
             a_arr.append(a_osc)
 
-            
-            # Вычисляем GR-компонент
             t_mill = datetime_to_vsop87_t(dt)
             _, _, dvarpi_vsop = vsop87e_compute(vsop_data[name], t_mill)
-#            gr_signal = precession_arcsec_per_century('P_391838', a_osc, e_osc) - dvarpi_vsop
-#            gr_values.append(gr_signal)
             dvarpi_vsop_arr.append(dvarpi_vsop)
 
-        # Unwrap varpi
         varpi_arr = np.array(varpi_arr)
-#        varpi_unwrapped = np.copy(varpi_arr)
         e_arr = np.array(e_arr)
         a_arr = np.array(a_arr)
-#        gr_values = np.array(gr_values)
         dvarpi_vsop_arr = np.array(dvarpi_vsop_arr)
 
-#        # Unwrap varpi
+        # Unwrap varpi
         varpi_unwrapped = np.copy(varpi_arr)
         for i in range(1, len(varpi_unwrapped)):
             while varpi_unwrapped[i] - varpi_unwrapped[i-1] > 180:
@@ -455,22 +441,29 @@ def run_precession_comparison(years=1980, step_days=30):
             while varpi_unwrapped[i] - varpi_unwrapped[i-1] < -180:
                 varpi_unwrapped[i] += 360
 
-        # dϖ/dt через центральную разность (arcsec/century)
+        # --- Секулярная скорость через линейную регрессию ---
+        # Вместо np.gradient — наклон прямой: varpi(t) = C0 + C1*t + periodic
+        coef = np.polyfit(years_arr, varpi_unwrapped, 1)
+        secular_rate_deg_per_year = coef[0]
+        secular_prec = secular_rate_deg_per_year * 3600 * 100  # arcsec/century
+
+        # --- Мгновенная скорость (для сравнения) ---
         step_years = step_days / 365.25
-        dvarpi = np.gradient(varpi_unwrapped, step_years)  # град/год
-        prec_obs = dvarpi * 3600 * 100  # → arcsec/century
+        dvarpi = np.gradient(varpi_unwrapped, step_years)
+        prec_obs_instant = dvarpi * 3600 * 100  # arcsec/century
 
-        # GR_obs: DE422 total minus VSOP87E Newtonian
-        gr_obs = prec_obs - dvarpi_vsop_arr
+        # --- Newtonian residual: DE422 total − published Newtonian ---
+        newtonian_val = NEWTONIAN_PLANETARY[name]
+        newtonian_residual_arr = prec_obs_instant - newtonian_val
 
-        # Модельные скорости
+        # --- VSOP difference (диагностика, НЕ GR) ---
+        vsop_diff_arr = prec_obs_instant - dvarpi_vsop_arr
+
+        # --- Модельные скорости ---
         prec_models = {}
- #       prec_models['GR_obs'] = gr_values  # <-- добавляем в prec_models
-
         for model in MODELS:
-            if model == 'GR_obs':
-#                prec_models[model] = gr_values
-                prec_models[model] = gr_obs
+            if model == 'Newtonian_residual':
+                prec_models[model] = newtonian_residual_arr
                 continue
             if model == 'P_391838_et':
                 prec = np.array([
@@ -486,18 +479,28 @@ def run_precession_comparison(years=1980, step_days=30):
 
         results[name] = {
             'days': days,
-            'years': days / 365.25,
+            'years': years_arr,
             'e': e_arr,
             'a': a_arr,
             'varpi': varpi_unwrapped,
-            'prec_obs': prec_obs,
+            # Полная скорость из DE422 (мгновенная)
+            'prec_obs': prec_obs_instant,
+            # Секулярная скорость (регрессия)
+            'secular_prec': secular_prec,
+            # Опубликованный Newtonian
+            'newtonian_planetary':
+                np.full(len(days), newtonian_val),
+            # Остаток после Newtonian
+            'residual_after_newtonian': newtonian_residual_arr,
+            # Теоретические модели
             'prec_models': prec_models,
-#            'gr_component': gr_values,
-            'gr_component': gr_obs,
+            # Диагностика: DE422 − VSOP87E (НЕ GR!)
+            'vsop_difference': vsop_diff_arr,
             'dvarpi_vsop': dvarpi_vsop_arr,
         }
 
     return results
+
 
 # ============================================================
 # ДЛИННЫЙ РАСЧЁТ (долготы)
@@ -711,6 +714,9 @@ if __name__ == '__main__':
               f"\u03c0={varpi:.4f}\u00b0  M={np.degrees(M):.4f}\u00b0")
 
     # --- Прямое сравнение скоростей прецессии ---
+    # ============================================================
+    # ВЫВОД ТАБЛИЦЫ ПРЕЦЕССИИ
+    # ============================================================
     print(f"\n{'='*80}")
     print("Прямое сравнение d\u03c0/dt (1980 лет, шаг 30 дней)")
     print(f"{'='*80}")
@@ -729,26 +735,47 @@ if __name__ == '__main__':
 #        gr_comp = prec_results[name]['gr_component']
 #        print(f"Средний GR-компонент ({name}): {np.mean(gr_comp):.4f} arcsec/century")
         r = prec_results[name]
-        obs = r['prec_obs']
-        print(f"\n  {name}:")
-        print(f"    {'Модель':>15}  {'Среднее (arcsec/век)':>20}  "
-              f"{'Ошибка':>12}  {'RMS остатка':>12}")
-        print(f"    {'-'*15}  {'-'*20}  {'-'*12}  {'-'*12}")
-        print(f"    {'Наблюдение':>15}  {np.mean(obs):20.4f}  {'—':>12}  {'—':>12}")
+#        obs = r['prec_obs']
+        secular = r['secular_prec']
+        newtonian = NEWTONIAN_PLANETARY[name]
+        residual_secular = secular - newtonian
 
-        for model in MODELS:
-            mod = r['prec_models'][model]
-            mean_mod = np.mean(mod)
-            err = np.mean(obs) - mean_mod
-            rms = np.sqrt(np.mean((obs - mod)**2))
-            print(f"    {model:>15}  {mean_mod:20.4f}  {err:+12.4f}  {rms:12.4f}")
+
+#        print(f"\n  {name}:")
+#        print(f"    {'Модель':>15}  {'Среднее (arcsec/век)':>20}  "
+#              f"{'Ошибка':>12}  {'RMS остатка':>12}")
+#        print(f"    {'-'*15}  {'-'*20}  {'-'*12}  {'-'*12}")
+#        print(f"    {'Наблюдение':>15}  {np.mean(obs):20.4f}  {'—':>12}  {'—':>12}")
+
+        print(f"\n  {name}:")
+        print(f"             {'Модель':>20s}  {'Среднее':>20s}  {'Секулярная':>20s}")
+        print(f"  {'-'*65}")
+        print(f"  {'DE422 total (мгновенная)':>20s}  {np.mean(r['prec_obs']):>20.4f}  {secular:>20.4f}")
+        print(f"  {'Newtonian (опубл.)':>20s}  {newtonian:>20.4f}  {newtonian:>20.4f}")
+        print(f"  {'Residual (DE422−Newt.)':>20s}  {np.mean(r['residual_after_newtonian']):>20.4f}  {residual_secular:>20.4f}")
+        print(f"  {'DE422−VSOP87E (диагн.)':>20s}  {np.mean(r['vsop_difference']):>20.4f}  {'—':>20s}")
+        print()
+
+  #      for model in MODELS:
+  #          mod = r['prec_models'][model]
+  #          mean_mod = np.mean(mod)
+  #          err = np.mean(obs) - mean_mod
+  #          rms = np.sqrt(np.mean((obs - mod)**2))
+  #          print(f"    {model:>15}  {mean_mod:20.4f}  {err:+12.4f}  {rms:12.4f}")
+        for model in ['P0', 'P_GR', 'P_391838', 'P_391838_et']:
+            val = np.mean(r['prec_models'][model])
+            print(f"  {model:>20s}  {val:>20.4f}")
 
         # Отношение RMS
-        rms_gr = np.sqrt(np.mean((obs - r['prec_models']['P_GR'])**2))
-        rms_a39 = np.sqrt(np.mean((obs - r['prec_models']['P_391838'])**2))
-        rms_a39et = np.sqrt(np.mean((obs - r['prec_models']['P_391838_et'])**2))
-        print(f"\n    RMS(A391838_e0) / RMS(GR)     = {rms_a39/rms_gr:.4f}")
-        print(f"    RMS(A391838_et) / RMS(GR)     = {rms_a39et/rms_gr:.4f}")
+#        rms_gr = np.sqrt(np.mean((obs - r['prec_models']['P_GR'])**2))
+#        rms_a39 = np.sqrt(np.mean((obs - r['prec_models']['P_391838'])**2))
+#        rms_a39et = np.sqrt(np.mean((obs - r['prec_models']['P_391838_et'])**2))
+#        print(f"\n    RMS(A391838_e0) / RMS(GR)     = {rms_a39/rms_gr:.4f}")
+#        print(f"    RMS(A391838_et) / RMS(GR)     = {rms_a39et/rms_gr:.4f}")
+
+        print()
+        print(f"  Секулярный остаток vs GR:     {residual_secular:.4f} vs {np.mean(r['prec_models']['P_GR']):.4f}")
+        print(f"  Секулярный остаток vs A391838: {residual_secular:.4f} vs {np.mean(r['prec_models']['P_391838']):.4f}")
 
 
 
@@ -910,6 +937,53 @@ if __name__ == '__main__':
     plt.savefig('heliocentric_longitude_2000yr.png', dpi=150, bbox_inches='tight')
     plt.show()
 
+    # ============================================================
+    # ГРАФИК: БЮДЖЕТ ПРЕЦЕССИИ
+    # ============================================================
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+
+    for idx, name in enumerate(['Mercury', 'Mars']):
+        ax = axes[idx]
+        r = prec_results[name]
+        yrs = r['years']
+
+        # Полная прецессия из DE422 (затухающая alpha)
+        ax.plot(yrs, r['prec_obs'], 'k-', lw=0.3, alpha=0.25,
+                label='DE422 total (мгновенная)')
+
+        # Newtonian planetary (горизонтальная линия)
+        ax.axhline(NEWTONIAN_PLANETARY[name], color='gray', ls='--',
+                   lw=1.5, label='Newtonian (опубл.)')
+
+        # Residual после Newtonian
+        ax.plot(yrs, r['residual_after_newtonian'], color='red',
+                lw=0.8, alpha=0.5, label='DE422 − Newtonian')
+
+        # GR теория
+        ax.plot(yrs, r['prec_models']['P_GR'], color='blue',
+                lw=1.5, label='P_GR (теория)')
+
+        # A391838 теория
+        ax.plot(yrs, r['prec_models']['P_391838'], color='green',
+                lw=1.5, label='P_391838 (теория)')
+
+        # Секулярная скорость (регрессия)
+        ax.axhline(r['secular_prec'], color='black', ls=':',
+                   lw=1, label=f'Секулярная: {r["secular_prec"]:.2f}')
+
+        ax.set_title(name, fontsize=13)
+        ax.set_xlabel('Годы от 1010 г.')
+        ax.set_ylabel('arcsec / век')
+        ax.grid(True, alpha=0.2)
+        ax.legend(fontsize=8, loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig('newtonian_residual_vs_gr.png', dpi=150, bbox_inches='tight')
+    plt.close()
+    print("  newtonian_residual_vs_gr.png")
+
+
+
     print(f"\n{'='*80}")
     print("\u0413\u0440\u0430\u0444\u0438\u043a\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b:")
     print("  long_comparison_2000yr.png")
@@ -918,5 +992,3 @@ if __name__ == '__main__':
     print("  osculating_elements.png")
     print("  heliocentric_longitude_2000yr.png")
     print(f"{'='*80}")
-
-
