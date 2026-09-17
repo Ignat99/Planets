@@ -1,17 +1,20 @@
 """
 Сравнение трёх моделей прецессии с реальными эфемеридами.
-Все исправления из критики применены.
+Все исправления применены.
 
 Модели:
   P0:       K / a^(5/2)                        — без e-поправки
   P_GR:     K / (a^(5/2) * (1-e^2))            — стандартная GR
   P_391838: (K + L*(A391838(e)-1)) / a^(5/2)   — A391838 (e.g.f.)
+  P_391838_et: то же с реальным e(t) из эфемериды
 
-Четыре доработки:
-  1. Удалена нормировка K_PGR — GR теперь стандартная
-  2. Добавлен график λ_model − λ_ephemeris для трёх моделей
-  3. Добавлена таблица вкладов каждого коэффициента A391838
-  4. Добавлена версия A(e(t)) с реальным e(t) из эфемериды
+Исправления:
+  1. K_PGR удалён — стандартная GR
+  2. График λ_model − λ_ephemeris
+  3. Таблица вкладов коэффициентов A391838
+  4. Модель A391838 с e(t)
+  5. Правильное преобразование ν → E → M для M_0
+  6. omega0 → varpi0 (долгота перигелия)
 
 Требования: pip install ephem numpy matplotlib
 """
@@ -19,7 +22,6 @@
 import ephem
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 # ============================================================
 # ВХОДНЫЕ ДАННЫЕ
@@ -29,12 +31,13 @@ NUM_DAYS = 81
 
 # ============================================================
 # ПЛАНЕТЫ (J2000)
+# varpi0 — долгота перигелия (Ω + ω), в градусах
 # ============================================================
 PLANETS = {
-    'Mercury': {'obj': ephem.Mercury(), 'period': 87.969,  'a': 0.387098, 'e': 0.205630, 'omega0': 77.456},
-    'Venus':   {'obj': ephem.Venus(),   'period': 224.701, 'a': 0.723332, 'e': 0.006772, 'omega0': 131.533},
-    'Earth':   {'obj': ephem.Sun(),     'period': 365.256, 'a': 1.000000, 'e': 0.016709, 'omega0': 102.937},
-    'Mars':    {'obj': ephem.Mars(),    'period': 686.98,  'a': 1.523679, 'e': 0.093400, 'omega0': 336.040},
+    'Mercury': {'obj': ephem.Mercury(), 'period': 87.969,  'a': 0.387098, 'e': 0.205630, 'varpi0': 77.456},
+    'Venus':   {'obj': ephem.Venus(),   'period': 224.701, 'a': 0.723332, 'e': 0.006772, 'varpi0': 131.533},
+    'Earth':   {'obj': ephem.Sun(),     'period': 365.256, 'a': 1.000000, 'e': 0.016709, 'varpi0': 102.937},
+    'Mars':    {'obj': ephem.Mars(),    'period': 686.98,  'a': 1.523679, 'e': 0.093400, 'varpi0': 336.040},
 }
 
 # ============================================================
@@ -51,6 +54,22 @@ def true_anomaly(M, e):
     ) % (2*np.pi)
 
 # ============================================================
+# Преобразование истинной аномалии → эксцентрическая → средняя
+# (исправление 5)
+# ============================================================
+def true_to_mean_anomaly(nu, e):
+    """ν → E → M через уравнение Кеплера."""
+    # ν → E
+    E = 2 * np.arctan2(
+        np.sqrt(1 - e) * np.sin(nu / 2),
+        np.sqrt(1 + e) * np.cos(nu / 2)
+    )
+    E = E % (2 * np.pi)
+    # E → M
+    M = (E - e * np.sin(E)) % (2 * np.pi)
+    return M
+
+# ============================================================
 # A391838 (нормализованные коэффициенты e.g.f.)
 # ============================================================
 A391838_norm = [1, 1, 1, 1.5, 3.0, 19/3, 55/4, 31, 72]
@@ -60,25 +79,22 @@ def A391838_truncated(e, order=8):
     return sum(c * e**k for k, c in enumerate(A391838_norm[:order+1]))
 
 # ============================================================
-# Калибровка (GR-only, Mercury+Venus)
+# Калибровка
 # ============================================================
 K = 3.8313
 L = 0.6496
 
 # ============================================================
-# Три модели прецессии (+ четвёртая: A391838 с e(t))
+# Четыре модели прецессии
 # ============================================================
 def precession_deg_per_day(model, a, e):
-    """Возвращает скорость прецессии в градусах/день."""
     if model == 'P0':
         prec = K / a**2.5
     elif model == 'P_GR':
-        # --- ДОРАБОТКА 1: стандартная GR без нормировки ---
         prec = K / (a**2.5 * (1 - e**2))
     elif model == 'P_391838':
         prec = (K + L * (A391838_truncated(e) - 1)) / a**2.5
     elif model == 'P_391838_et':
-        # --- ДОРАБОТКА 4: A391838 с реальным e(t) ---
         prec = (K + L * (A391838_truncated(e) - 1)) / a**2.5
     return prec / 3600.0 / 36525.0  # arcsec/century → deg/day
 
@@ -91,54 +107,38 @@ def real_helio_long(name, dt):
     return np.degrees(float(obj.hlon)) % 360.0
 
 # ============================================================
-# Реальный эксцентриситет из эфемериды (доработка 4)
-# ============================================================
-#def real_eccentricity(name, dt):
-#    obj = PLANETS[name]['obj']
-#    obj.compute(dt)
-#    return float(obj.e)
-
-
-# ============================================================
-# Реальный эксцентриситет из эфемериды (доработка 4, исправленная)
+# Реальный эксцентриситет из эфемериды
 # ============================================================
 def real_eccentricity(name, dt):
-    """Вычисляет мгновенный эксцентриситет из sun_distance и hlon."""
     p = PLANETS[name]
     obj = p['obj']
     obj.compute(dt)
     a = p['a']
-    omega0 = np.radians(p['omega0'])
+    varpi0 = np.radians(p['varpi0'])
 
-    # Расстояние от Солнца (в AU)
     if name == 'Earth':
         r = float(obj.earth_distance)
     else:
         r = float(obj.sun_distance)
 
-    # Истинная аномалия (приближённо: hlon - omega0)
     hlon = np.radians(np.degrees(float(obj.hlon)) % 360.0)
-    nu = (hlon - omega0) % (2 * np.pi)
+    nu = (hlon - varpi0 + np.pi) % (2 * np.pi) - np.pi
     cos_nu = np.cos(nu)
 
-    # Квадратное уравнение: a*e² + r*cos(ν)*e - (a-r) = 0
-    # из r = a(1-e²)/(1+e·cos(ν))
     discriminant = (r * cos_nu) ** 2 + 4 * a * (a - r)
     if discriminant < 0:
-        return p['e']  # fallback на J2000
+        return p['e']
     e = (-r * cos_nu + np.sqrt(discriminant)) / (2 * a)
     return max(0.0, min(0.99, e))
 
-
-
 # ============================================================
-# Модельная долгота
+# Модельная долгота (с исправленным M_0)
 # ============================================================
 def compute_model_long(name, model, start_date, day):
     p = PLANETS[name]
     period = p['period']
     e = p['e']
-    omega0 = np.radians(p['omega0'])
+    varpi0 = np.radians(p['varpi0'])
     n = 2 * np.pi / period
 
     # Для P_391838_et берём реальный e(t)
@@ -148,20 +148,22 @@ def compute_model_long(name, model, start_date, day):
 
     domega = precession_deg_per_day(model, p['a'], e)
 
+    # --- Исправление 5: правильное M_0 через ν → E → M ---
     lon_0 = np.radians(real_helio_long(name, start_date))
-    M_0 = (lon_0 - omega0) % (2 * np.pi)
+    nu_0 = (lon_0 - varpi0 + np.pi) % (2 * np.pi) - np.pi
+    M_0 = true_to_mean_anomaly(nu_0, e)
 
     M = M_0 + n * day
-    omega = omega0 + np.radians(domega) * day
-    lon = np.degrees(omega + true_anomaly(M, e)) % 360.0
+    varpi = varpi0 + np.radians(domega) * day
+    lon = np.degrees(varpi + true_anomaly(M, e)) % 360.0
     return lon
 
 # ============================================================
-# ДОРАБОТКА 3: Таблица вкладов коэффициентов A391838
+# Таблица вкладов коэффициентов A391838
 # ============================================================
 def print_contribution_table():
     print(f"\n{'='*80}")
-    print("ДОРАБОТКА 3: Вклады коэффициентов A391838 по планетам")
+    print("Вклады коэффициентов A391838 по планетам")
     print(f"{'='*80}")
     print(f"\nA(e) - 1 = сумма вкладов (поправка к K)\n")
 
@@ -197,7 +199,6 @@ MODEL_LABELS = {
     'P_391838_et': 'P_A391838 (e(t))',
 }
 
-# --- Доработка 3: таблица вкладов ---
 print_contribution_table()
 
 start = ephem.Date((INPUT_YEAR, INPUT_MONTH, INPUT_DAY, INPUT_HOUR, 0, 0))
@@ -225,7 +226,7 @@ for name in PLANETS:
         results[name][model] = rows
 
 # ============================================================
-# ВЫВОД ТАБЛИЦЫ (каждые 10 дней)
+# ВЫВОД ТАБЛИЦЫ
 # ============================================================
 for name in ['Mercury', 'Venus', 'Earth', 'Mars']:
     p = PLANETS[name]
@@ -261,22 +262,21 @@ print("\u0394\u00b0 — угловое расхождение (градусы)")
 print("Положительное значение — модель опережает реальную планету")
 
 # ============================================================
-# ДОРАБОТКА 2: График λ_model − λ_ephemeris (главный график)
+# ГРАФИК 1: λ_model − λ_ephemeris
 # ============================================================
 days_81 = np.arange(1, NUM_DAYS + 1)
 
 fig1, axes1 = plt.subplots(2, 2, figsize=(16, 12))
 colors_model = {
-    'P0':       '#95a5a6',
-    'P_GR':     '#3498db',
-    'P_391838': '#e74c3c',
+    'P0':          '#95a5a6',
+    'P_GR':        '#3498db',
+    'P_391838':    '#e74c3c',
     'P_391838_et': '#2ecc71',
 }
 
 for idx, name in enumerate(['Mercury', 'Venus', 'Earth', 'Mars']):
     ax = axes1[idx // 2][idx % 2]
 
-    # Вычисляем ошибку относительно эфемериды для каждой модели
     errors = {}
     for model in MODELS:
         err_list = []
@@ -284,16 +284,13 @@ for idx, name in enumerate(['Mercury', 'Venus', 'Earth', 'Mars']):
             lon_model = compute_model_long(name, model, start, day)
             lon_real = real_helio_long(name, ephem.Date(start) + day)
             d = (lon_model - lon_real + 180) % 360 - 180
-            # unwrapping
             err_list.append(d)
         err = np.array(err_list, dtype=float)
-        # unwrap
         for i in range(1, len(err)):
             while err[i] - err[i-1] > 180: err[i] -= 360
             while err[i] - err[i-1] < -180: err[i] += 360
-        # Убираем начальную подгонку (Δλ(t₀))
         err -= err[0]
-        errors[model] = err * 3600  # → arcsec
+        errors[model] = err * 3600
 
     for model in MODELS:
         ax.plot(days_81, errors[model],
@@ -309,7 +306,7 @@ for idx, name in enumerate(['Mercury', 'Venus', 'Earth', 'Mars']):
     ax.grid(True, alpha=0.2)
 
 fig1.suptitle(
-    'Доработка 2: Расхождение моделей с реальной эфемеридой\n'
+    'Расхождение моделей с реальной эфемеридой\n'
     '(начальная подгонка удалена — \u0394\u03bb(t\u2080)=0)',
     fontsize=13, fontweight='bold')
 plt.tight_layout()
@@ -317,14 +314,12 @@ plt.savefig('model_vs_ephemeris.png', dpi=150, bbox_inches='tight')
 plt.show()
 
 # ============================================================
-# ГРАФИК: разница между моделями за 10 лет (как раньше)
+# ГРАФИК 2: разница между моделями за 10 лет
 # ============================================================
 days_10yr = np.arange(1, 3653, 5)
 start_10 = ephem.Date((2020, 1, 1, 0, 0, 0))
 
 fig2, axes2 = plt.subplots(2, 2, figsize=(16, 12))
-colors_planet = {'Mercury': '#e74c3c', 'Venus': '#2ecc71',
-                 'Earth': '#3498db', 'Mars': '#e67e22'}
 
 for idx, name in enumerate(['Mercury', 'Venus', 'Earth', 'Mars']):
     ax = axes2[idx // 2][idx % 2]
@@ -368,3 +363,4 @@ fig2.suptitle(
 plt.tight_layout()
 plt.savefig('model_differences_10yr.png', dpi=150, bbox_inches='tight')
 plt.show()
+
