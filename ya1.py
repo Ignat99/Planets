@@ -6,17 +6,21 @@
   P0:          K / a^(5/2)                        — без e-поправки
   P_GR:        K / (a^(5/2) * (1-e^2))            — стандартная GR
   P_391838:    (K + L*(A391838(e)-1)) / a^(5/2)   — A391838, постоянный e
-  P_391838_et: (K + L*(A391838(e(t))-1)) / a^(5/2) — A391838, реальный e(t)
+  P_391838_et: (K + L*(A391838(e(t))-1)) / a^(5/2) — A391838, эффективный e(t)
 
 Исправления:
   1. K_PGR удалён — GR стандартная, без нормировки по Меркурию
   2. График λ_model − λ_ephemeris для всех моделей
   3. Таблица вкладов коэффициентов A391838 по планетам
-  4. Модель P_391838_et с реальным e(t) из эфемериды
+  4. Модель P_391838_et с эффективным e(t) из эфемериды
+     (восстановлен из r(t) и hlon(t) при фиксированном varpi0 J2000;
+      не совпадает с истинным осциллирующим e при длительных интервалах)
   5. M_0 вычисляется через ν → E → M (уравнение Кеплера)
   6. omega0 → varpi0 (долгота перигелия, не аргумент)
   7. Земля: hlon без +180°
   8. M_0 использует e на стартовую дату, текущий шаг — e(t)
+  9. Фазовая метрика для P_391838_et использует e(t), а не постоянный e
+  10. K, L — эмпирические калибровочные параметры, не фундаментальные константы
 
 Требования: pip install ephem numpy matplotlib
 """
@@ -81,9 +85,10 @@ def A391838_truncated(e, order=8):
     return sum(c * e**k for k, c in enumerate(A391838_norm[:order+1]))
 
 # ============================================================
-# Калибровка (GR-only, Mercury+Venus)
+# Калибровочные параметры (эмпирические, не фундаментальные)
 # K = 3.8313 arcsec/century — базовая прецессия
 # L = 0.6496 — вес A391838-поправки
+# Подогнаны под GR-значения Меркурия и Венеры
 # ============================================================
 K = 3.8313
 L = 0.6496
@@ -114,10 +119,13 @@ def real_helio_long(name, dt):
     return np.degrees(float(obj.hlon)) % 360.0
 
 # ============================================================
-# Реальный эксцентриситет из эфемериды
-# Вычисляется из sun_distance и hlon через уравнение орбиты
+# Эффективный эксцентриситет из эфемериды
+# Восстанавливается из r(t) и hlon(t) при фиксированном varpi0 (J2000).
+# Не совпадает с истинным осциллирующим e орбиты при длительных
+# интервалах, т.к. varpi(t) ≠ varpi0.
+# Для коротких интервалов (десятки дней) — приемлемое приближение.
 # ============================================================
-def real_eccentricity(name, dt):
+def effective_eccentricity(name, dt):
     p = PLANETS[name]
     obj = p['obj']
     obj.compute(dt)
@@ -130,7 +138,7 @@ def real_eccentricity(name, dt):
     else:
         r = float(obj.sun_distance)
 
-    # Истинная аномалия (приближённо)
+    # Истинная аномалия (приближённо, при фиксированном varpi0)
     hlon = np.radians(np.degrees(float(obj.hlon)) % 360.0)
     nu = (hlon - varpi0 + np.pi) % (2 * np.pi) - np.pi
     cos_nu = np.cos(nu)
@@ -155,9 +163,9 @@ def compute_model_long(name, model, start_date, day):
 
     # Для P_391838_et: e на стартовую дату и на текущую дату
     if model == 'P_391838_et':
-        e_start = real_eccentricity(name, start_date)
+        e_start = effective_eccentricity(name, start_date)
         dt_current = ephem.Date(start_date) + day
-        e_current = real_eccentricity(name, dt_current)
+        e_current = effective_eccentricity(name, dt_current)
     else:
         e_start = e0
         e_current = e0
@@ -238,6 +246,13 @@ for name in PLANETS:
         rows = []
         for day in range(1, NUM_DAYS + 1):
             dt = ephem.Date(start) + day
+
+            # --- Исправление 9: e(t) в фазовой метрике ---
+            if model == 'P_391838_et':
+                e_for_rate = effective_eccentricity(name, dt)
+            else:
+                e_for_rate = PLANETS[name]['e']
+
             lon_model = compute_model_long(name, model, start, day)
             lon_real = real_helio_long(name, dt)
             # Минимальное угловое расхождение в [-180, 180]
@@ -245,7 +260,7 @@ for name in PLANETS:
             # Полная угловая скорость (среднее движение + прецессия)
             n_deg = 360.0 / PLANETS[name]['period']
             prec_rate = precession_deg_per_day(
-                model, PLANETS[name]['a'], PLANETS[name]['e'])
+                model, PLANETS[name]['a'], e_for_rate)
             rate = n_deg + prec_rate  # град/день
             # Эквивалентная фазовая ошибка (секунды)
             equivalent_phase_time_error = dlon / rate * 86400
@@ -394,5 +409,3 @@ fig2.suptitle(
 plt.tight_layout()
 plt.savefig('model_differences_10yr.png', dpi=150, bbox_inches='tight')
 plt.show()
-
-
