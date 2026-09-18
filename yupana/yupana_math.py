@@ -490,6 +490,79 @@ if __name__ == "__main__":
     print("\nA391838 sequence:")
     print(a391838_sequence(10))
 
+
+# ============================================================
+# Section 8a: A391838 — полиномиальное представление
+# ============================================================
+
+def a391838_formula(n):
+    """
+    Замкнутая формула A391838: a(n) = 2^n * n! * (2n+1).
+    """
+    import math
+    return (2 ** n) * math.factorial(n) * (2 * n + 1)
+
+
+def a391838_polynomial(n_terms=10):
+    """
+    Полиномиальное представление A391838 через интерполяцию Ньютона.
+    Возвращает список коэффициентов (Fraction), интерполирующих
+    первые n_terms членов: P(0)=1, P(1)=6, P(2)=40, ...
+    """
+    from fractions import Fraction
+    import math
+
+    seq_vals = a391838_sequence(n_terms)
+    n = len(seq_vals)
+
+    diff_table = [list(seq_vals)]
+    for level in range(1, n):
+        prev = diff_table[-1]
+        curr = [prev[i + 1] - prev[i] for i in range(len(prev) - 1)]
+        diff_table.append(curr)
+
+    poly_coeffs = [Fraction(0)] * n
+    for k in range(n):
+        ff = [Fraction(0)] * (k + 1)
+        ff[0] = Fraction(1)
+        for j in range(k):
+            new_ff = [Fraction(0)] * (k + 1)
+            for i in range(len(ff)):
+                new_ff[i] += ff[i] * (-j)
+                if i + 1 < k + 1:
+                    new_ff[i + 1] += ff[i]
+            ff = new_ff
+
+        scale = Fraction(diff_table[k][0], math.factorial(k))
+        for i in range(k + 1):
+            poly_coeffs[i] += scale * ff[i]
+
+    return poly_coeffs
+
+
+def a391838_polynomial_eval(x, n_terms=10):
+    """
+    Вычислить значение интерполяционного полинома A391838 в точке x.
+    """
+    from fractions import Fraction
+    coeffs = a391838_polynomial(n_terms)
+    val = Fraction(0)
+    xf = Fraction(x)
+    power = Fraction(1)
+    for c in coeffs:
+        val += c * power
+        power *= xf
+    return val
+
+
+def a391838_generating_function_coeffs(n_terms=10):
+    """
+    Коэффициенты экспоненциального производящего ряда A391838:
+    E(x) = (1 + 2x) / (1 - 2x)^2, коэффициенты = (2n+1)*2^n.
+    """
+    return [(2 * n + 1) * (2 ** n) for n in range(n_terms)]
+
+
     print("\nA391838 triangular representations:")
     for n, val, rep in a391838_triangular_indices(10):
         print(f"  n={n}, val={val}: {rep}")
