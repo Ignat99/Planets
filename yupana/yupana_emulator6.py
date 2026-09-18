@@ -36,6 +36,16 @@ from yupana_lattice_hook import lattice_to_yupana, lattice_to_bottom_row
 left_row, right_row, result, info = lattice_to_yupana(23, 41)
 bottom = lattice_to_bottom_row(23, 41)
 
+from yupana_involute import involute_to_yupana_bottom_row, involute_to_yupana_full
+
+# Упрощённый — результат в нижнюю строку:
+bottom = involute_to_yupana_bottom_row(x_val=1, n_terms=5, scale=100000)
+
+# Полный — раскладка по столбцам + результат:
+columns, sin_result, cos_result, info = involute_to_yupana_full(
+    x_val=math.pi/6, n_terms=5, scale=100000
+)
+
 
 from yupana_math import (
     S_MAX, stirling_first_kind,
