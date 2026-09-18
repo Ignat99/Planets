@@ -1,7 +1,708 @@
-"law_16": {
-    "ru": "Закон Ампера",
-    "en": "Ampere's law",
-    "formula": "F = B * l1 * Eps_0*c^3",
-    "part_order": ["B", "I", "l1"],
-    "comments": {"ru": "...", "en": "..."}
+{
+  "description": "Физические законы СФВ Плотникова — формулы через Eps_0*c^n",
+  "source": "https://plotnikovna.narod.ru/",
+  "laws": {
+    "law_1": {
+      "ru": "Закон Ома",
+      "en": "Ohm's Law",
+      "name": "",
+      "formula": "gamma*T = j = (sig*E/T)*T",
+      "part_order": [],
+      "comments": {
+        "ru": "Импульс удельного веса — это плотность электрического тока. Удельный вес — это шаг спирали, умноженный на удельную проводимость",
+        "en": "Impulse specific gravity is the electric current density. Specific weight is multiplied by a pitch conductivity"
+      }
+    },
+    "law_2": {
+      "ru": "Закон Джоуля — Ленца",
+      "en": "Joule — Lenz",
+      "name": "",
+      "formula": "Q = ((I / Eps_0*c^2) * dl1) * Eps_0*c^3",
+      "part_order": [],
+      "comments": {
+        "ru": "I = Eps_0*c^3, 1/Eps_0*c^2 = 1/c * R, T = 1/c * dl1: при прохождении тока через проводник выделяется тепло",
+        "en": "When current flows through a conductor, heat is released"
+      }
+    },
+    "law_3": {
+      "ru": "Эффект Зеебека",
+      "en": "Seebeck effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_4": {
+      "ru": "Эффект Томсона",
+      "en": "Thomson effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_5": {
+      "ru": "Эффект Пельтье",
+      "en": "Peltier effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_6": {
+      "ru": "Закон Био — Савара — Лапласа",
+      "en": "Biot — Savart — Laplace",
+      "name": "",
+      "formula": "B = I / l1 / Eps_0*c^2",
+      "part_order": [],
+      "comments": {
+        "ru": "tau = 1/Eps_0*c^2, l1 = l1 * alpha, 1/l1 = l1 / S / alpha: элемент провода l1 с током I создаёт индукцию магнитного поля в вакууме B",
+        "en": "Element wire l1 with current I creates magnetic induction in vacuo B"
+      }
+    },
+    "law_7": {
+      "ru": "Сверхпроводимость",
+      "en": "superconductivity",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_8": {
+      "ru": "Тензорезистивный эффект",
+      "en": "Thin-film effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_9": {
+      "ru": "Вторичная электронная эмиссия",
+      "en": "Secondary electron emission",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_10": {
+      "ru": "Эффект Ганна",
+      "en": "Gunn effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_11": {
+      "ru": "Второй закон Ньютона",
+      "en": "Newton's second law",
+      "name": "",
+      "formula": "E = F / m",
+      "part_order": [],
+      "comments": {
+        "ru": "Ускорение пропорционально силе и направлено по прямой действия силы",
+        "en": "Acceleration is proportional to force and directed by direct action of the force"
+      }
+    },
+    "law_12": {
+      "ru": "Магниторезистивный эффект",
+      "en": "magnetoresistive effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_13": {
+      "ru": "Эффект Гопкинсона",
+      "en": "Hopkinson effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_14": {
+      "ru": "Катодолюминесценция",
+      "en": "cathodoluminescence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_15": {
+      "ru": "Пироэлектрический эффект",
+      "en": "pyroelectric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_16": {
+      "ru": "Закон Ампера",
+      "en": "Ampere's law",
+      "name": "",
+      "formula": "F = B * l1 * Eps_0*c^3",
+      "part_order": [
+        "B",
+        "I",
+        "l1"
+      ],
+      "comments": {
+        "ru": "I = Eps_0*c^3, l1 = l1 * alpha: элемент провода l1 с током I создаёт индукцию магнитного поля B",
+        "en": "Element wire l1 with current I creates magnetic induction B"
+      }
+    },
+    "law_17": {
+      "ru": "Электрокалорический эффект",
+      "en": "electrocaloric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_18": {
+      "ru": "Термоэлектронная эмиссия",
+      "en": "thermionic emission",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_19": {
+      "ru": "Эффект Холла",
+      "en": "Hall effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_20": {
+      "ru": "Магнитострикция",
+      "en": "magnetostriction",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_21": {
+      "ru": "Эффект Эйнштейна — де — Хааза",
+      "en": "Einstein — de — Haas",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_22": {
+      "ru": "Автоэлектронная эмиссия",
+      "en": "field electron emission",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_23": {
+      "ru": "Эффект Виллари (магнитоупругий эффект)",
+      "en": "Villari effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_24": {
+      "ru": "Электролюминесценция",
+      "en": "electroluminescence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_25": {
+      "ru": "Эффект Магнуса",
+      "en": "Magnus effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_26": {
+      "ru": "Естественная оптическая активность",
+      "en": "Natural optical activity",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_27": {
+      "ru": "Эффект Баркгаузена",
+      "en": "Barkhausen effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_28": {
+      "ru": "Эффект Барнетта",
+      "en": "Barnett effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_29": {
+      "ru": "Закон Брюстера",
+      "en": "Brewster's law",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_30": {
+      "ru": "Закон всемирного тяготения",
+      "en": "Law of gravitation",
+      "name": "",
+      "formula": "F = ((m / Eps_0*c^1) * Eps_0*c^3) / dl1",
+      "part_order": [
+        "m",
+        "l1"
+      ],
+      "comments": {
+        "ru": "T / l1 = 1 / c^1, m = Eps_0*c^2 * l1 = tau * l1, T/T: сила взаимодействия 2 масс пропорциональна их произведению и обратно пропорциональна квадрату расстояния",
+        "en": "Interaction force of 2 masses is proportional to their product and inversely proportional to the square of the distance"
+      }
+    },
+    "law_31": {
+      "ru": "Пьезоэлектрический эффект",
+      "en": "Piezoelectric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_32": {
+      "ru": "Обратный пьезоэлектрический эффект",
+      "en": "inverse piezoelectric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_33": {
+      "ru": "Пьезомагнитный эффект",
+      "en": "piezomagnetic effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_34": {
+      "ru": "Закон Кулона",
+      "en": "Coulomb's law",
+      "name": "",
+      "formula": "F = ((m / Eps_0*c^1) * Eps_0*c^3) / dl1",
+      "part_order": [
+        "m",
+        "l1"
+      ],
+      "comments": {
+        "ru": "T / l1 = 1 / c^1, m = Eps_0*c^2 * l1 = tau * l1, T/T: сила взаимодействия 2 зарядов пропорциональна их произведению и обратно пропорциональна квадрату расстояния",
+        "en": "Interaction force of 2 charges is proportional to their product and inversely proportional to the square of the distance"
+      }
+    },
+    "law_35": {
+      "ru": "Сила Лоренца",
+      "en": "Lorentz force",
+      "name": "",
+      "formula": "F = m * E = (B * ((m / Eps_0*c^1) / v_s) * Eps_0*c^3)",
+      "part_order": [
+        "B",
+        "m",
+        "v_s"
+      ],
+      "comments": {
+        "ru": "v_s = Eps_0*c^3 / Eps_0*c^1 / v_s = I * R / v_s, B = B * alpha: сила перпендикулярная скорости заряда и вектору магнитного поля",
+        "en": "Force perpendicular to the velocity of the charge and the magnetic field vector"
+      }
+    },
+    "law_36": {
+      "ru": "Электромагнитная индукция",
+      "en": "Electromagnetic induction",
+      "name": "",
+      "formula": "phi = Phi_m / T",
+      "part_order": [
+        "Phi_m",
+        "T"
+      ],
+      "comments": {
+        "ru": "Электродвижущая сила электромагнитной индукции пропорциональна скорости изменения магнитного потока",
+        "en": "Electromagnetic induction electromotive force is proportional to the rate of change of magnetic flux"
+      }
+    },
+    "law_37": {
+      "ru": "Электростатическая индукция",
+      "en": "electrostatic induction",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_38": {
+      "ru": "Самоиндукция",
+      "en": "inductance",
+      "name": "",
+      "formula": "D = tau / l1",
+      "part_order": [
+        "tau",
+        "l1"
+      ],
+      "comments": {
+        "ru": "D = 1 / L, tau = 1 / m_o, li / (N / l1) = V3 * (N / l1): самоиндукция не даёт мгновенно изменять значение тока в электрической цепи",
+        "en": "Inductance does not instantly change the value of the current in an electrical circuit"
+      }
+    },
+    "law_39": {
+      "ru": "Фотоэлектронная эмиссия (внешний фотоэффект)",
+      "en": "photoemission",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_40": {
+      "ru": "Терморезистивный эффект",
+      "en": "thermoresistive effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_41": {
+      "ru": "Эффект Мейснера",
+      "en": "Meissner effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_42": {
+      "ru": "Эффект Поккельса",
+      "en": "Pockels effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_43": {
+      "ru": "Вихревые токи (токи Фуко)",
+      "en": "eddy currents",
+      "name": "",
+      "formula": "I = Phi_m / l1 * Eps_0*c^2",
+      "part_order": [
+        "Phi_m",
+        "l1"
+      ],
+      "comments": {
+        "ru": "tau = 1 / m_o = Eps_0*c^2: замкнутые электрические токи в массивных проводниках, возникающие при изменении пронизывающего их магнитного поля",
+        "en": "Closed electrical currents in massive conductors arising from a change of the magnetic field"
+      }
+    },
+    "law_44": {
+      "ru": "Гальваноупругий магнитный эффект",
+      "en": "Galvano elastic magnetic effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_45": {
+      "ru": "Диэлектрический гистерезис",
+      "en": "dielectric hysteresis",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_46": {
+      "ru": "Магнитоэлектрический эффект в антиферромагнетиках",
+      "en": "Magneto-electric effect in antiferromagnets",
+      "name": "",
+      "formula": "",
+      "part_order": [],
+      "exit_c": "magnetization"
+    },
+    "law_47": {
+      "ru": "Магнитоэлектрический эффект в антиферромагнетиках",
+      "en": "Magneto-electric effect in antiferromagnets",
+      "name": "",
+      "formula": "",
+      "part_order": [],
+      "exit_c": "polarized"
+    },
+    "law_48": {
+      "ru": "Акустомагнитоэлектрический эффект",
+      "en": "Acousto-magneto-electric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_49": {
+      "ru": "Действие магнитного поля на контур с током",
+      "en": "Effect of a magnetic field on a current loop",
+      "name": "",
+      "formula": "Q = B * S * Eps_0*c^3",
+      "part_order": [
+        "B",
+        "S",
+        "alpha"
+      ],
+      "comments": {
+        "ru": "I = Eps_0*c^3, S = S * alpha: на контур с током в магнитном поле действует момент сил, разворачивающий контур",
+        "en": "On a current loop in a magnetic field acts a torque unfolding the loop"
+      }
+    },
+    "law_50": {
+      "ru": "Акустический парамагнитный резонанс",
+      "en": "Acoustic paramagnetic resonance",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_51": {
+      "ru": "Магнитный гистерезис",
+      "en": "magnetic hysteresis",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_52": {
+      "ru": "Поляризация диэлектриков",
+      "en": "polarization of dielectrics",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_53": {
+      "ru": "Ионизация газа под действием электрического поля",
+      "en": "Ionization of the gas by the electric field",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_54": {
+      "ru": "Пробой диэлектриков",
+      "en": "dielectric breakdown",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_55": {
+      "ru": "Взрывная электронная эмиссия",
+      "en": "Explosive electron emission",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_56": {
+      "ru": "Триболюминесценция",
+      "en": "triboluminescence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_57": {
+      "ru": "Дуговой разряд",
+      "en": "arc discharge",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_58": {
+      "ru": "Тлеющий разряд",
+      "en": "glow discharge",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_59": {
+      "ru": "Искровой разряд",
+      "en": "sparkover",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_60": {
+      "ru": "Эффект Кикоина — Носкова",
+      "en": "Kikoin — Noskov effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_61": {
+      "ru": "Термоэлектретный эффект",
+      "en": "thermoelectret effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_62": {
+      "ru": "Термолюминесценция",
+      "en": "thermoluminescence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_63": {
+      "ru": "Намагничивание тел",
+      "en": "magnetization bodies",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_64": {
+      "ru": "Безэлектродный кольцевой разряд",
+      "en": "Electrodeless ring discharge",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_65": {
+      "ru": "Звуковое радиационное давление",
+      "en": "Sound radiation pressure",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_66": {
+      "ru": "Электрострикция",
+      "en": "electrostriction",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_67": {
+      "ru": "Эффект Фарадея",
+      "en": "Faraday effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_68": {
+      "ru": "Эффект Коттона — Мутона",
+      "en": "Cotton — Mouton effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_69": {
+      "ru": "Эффект Доплера в оптике",
+      "en": "Doppler effect in optics",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_70": {
+      "ru": "Эффект Керра",
+      "en": "Kerr effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_71": {
+      "ru": "Теплопроводность изотропных тел",
+      "en": "Thermal conductivity of isotropic bodies",
+      "name": {
+        "ru": "закон Фурье",
+        "en": "Fourier law"
+      },
+      "formula": "S_l = alpha / l1 * Eps_0*c^5",
+      "part_order": [
+        "l_1"
+      ],
+      "comments": {
+        "ru": "l_1 = Eps_0*c^5 / l1: закон Фурье утверждает, что скорость передачи тепла через материал пропорциональна отрицательному градиенту температуры и площади",
+        "en": "Fourier's law states that the rate of heat transfer through a material is proportional to the negative gradient of temperature and the area"
+      }
+    },
+    "law_72": {
+      "ru": "Фотопластический эффект",
+      "en": "photoplastic effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_73": {
+      "ru": "Основные уравнения динамики вращательного движения твёрдого тела",
+      "en": "Basic equations of dynamics of rotational motion",
+      "name": "",
+      "formula": "L = Q * T",
+      "part_order": [
+        "Q",
+        "T"
+      ],
+      "comments": {
+        "ru": "Изменение момента количества движения твёрдого тела равно импульсу момента всех внешних сил",
+        "en": "Change of angular momentum of a rigid body equals the momentum of all moments of external forces"
+      }
+    },
+    "law_74": {
+      "ru": "Тормозное рентгеновское излучение",
+      "en": "Bremsstrahlung",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_75": {
+      "ru": "Эффект Доплера в акустике",
+      "en": "Doppler effect in acoustics",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_76": {
+      "ru": "Акустоэлектрический эффект",
+      "en": "acoustoelectric effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_77": {
+      "ru": "Двойное лучепреломление",
+      "en": "birefringence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_78": {
+      "ru": "Эффект Нернста",
+      "en": "Nernst effect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_79": {
+      "ru": "Тепловое расширение тел",
+      "en": "Thermal expansion of bodies",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_80": {
+      "ru": "Фотоупругость (пьезооптический эффект)",
+      "en": "Photoelasticity",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_81": {
+      "ru": "Фотопроводимость (фоторезистивный эффект)",
+      "en": "Photoconductivity",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_82": {
+      "ru": "Поглощение звука",
+      "en": "sound absorption",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_83": {
+      "ru": "Поглощение света",
+      "en": "absorption of light",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_84": {
+      "ru": "Полное внутреннее отражение",
+      "en": "Total internal reflection",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_85": {
+      "ru": "Фотолюминесценция",
+      "en": "photoluminescence",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_86": {
+      "ru": "Закон Кюри",
+      "en": "Curie's law",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    },
+    "law_87": {
+      "ru": "Вентильный фотоэффект",
+      "en": "valve photoeffect",
+      "name": "",
+      "formula": "",
+      "part_order": []
+    }
+  }
 }
