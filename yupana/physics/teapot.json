@@ -1,0 +1,234 @@
+{
+  "_metadata": {
+    "description": "Доменный анализ электрочайника: декомпозиция на части с физическими законами",
+    "source": "teapot.js (ScriptCraft)",
+    "method": "Диакоптика Крона — разбиение на подсистемы, соединение через матрицы связи",
+    "references": [
+      "http://www.elremont.ru/small_rbt/chainik1.php",
+      "http://www.e-reading.ws/chapter.php/83924/80/Korshever_-_Elektrika_v_dome.html"
+    ],
+    "parts": 6,
+    "external_inputs": 4,
+    "external_outputs": 4
+  },
+  "input": {
+    "electric_network": {
+      "id": "V1",
+      "desc": "Электрическая сеть 220В"
+    },
+    "aqua": {
+      "id": "V2",
+      "desc": "Вода в ёмкости"
+    },
+    "environment": {
+      "id": "V3",
+      "desc": "Окружающая среда (воздух)"
+    },
+    "table": {
+      "id": "V4",
+      "desc": "Поверхность (стол)"
+    }
+  },
+  "output": {
+    "time_work": {
+      "id": "T",
+      "desc": "Время работы"
+    },
+    "electric_power": {
+      "id": "N_l",
+      "desc": "Электрическая мощность"
+    },
+    "minimum_temperature": {
+      "id": "alpha",
+      "desc": "Минимальная температура"
+    },
+    "maximum_temperature": {
+      "id": "alpha",
+      "desc": "Максимальная температура"
+    }
+  },
+  "parts": {
+    "plug": {
+      "id": "E0",
+      "name": "Вилка",
+      "connections": [
+        {
+          "type": "attach",
+          "to": "wire (E1)",
+          "process": "GA + GB -> GAB",
+          "process_ref": "process_10 (соединение)",
+          "physical_laws": "E1(phi)->E0(phi)"
+        }
+      ],
+      "terminals": {
+        "cable_grip": "E4",
+        "earth_terminal": "E0",
+        "line_terminal": "E1",
+        "neutral_terminal": "E2",
+        "hull": "E3"
+      }
+    },
+    "wire": {
+      "id": "E1",
+      "name": "Провод",
+      "connections": [
+        {
+          "type": "attach",
+          "to": "electric_network (V1)",
+          "process": "GA o-o GA",
+          "process_ref": "process_9 (связь)",
+          "physical_laws": "V1(phi)o-oE1(phi):V1(I)o-oE1(I)"
+        }
+      ],
+      "pins": {
+        "input": "A:B:C",
+        "output": "A:B:C",
+        "inout": "A:B:C"
+      }
+    },
+    "spiral": {
+      "id": "E2",
+      "name": "Спираль (ТЭН)",
+      "connections": [
+        {
+          "type": "attach",
+          "to": "plug (E0)",
+          "process": "GA -> GB:GB -> GA",
+          "process_ref": "process_5 (преобразование)",
+          "physical_laws": "U/R->I:I*R->U"
+        }
+      ],
+      "terminals": {
+        "earth_terminal": "E0",
+        "line_terminal": "E1",
+        "neutral_terminal": "E2",
+        "hull": "E3"
+      },
+      "subparts": {
+        "spiral_wire": {
+          "id": "E4",
+          "name": "Нить спирали",
+          "connections": [
+            {
+              "type": "attach",
+              "earth_terminal": "E3",
+              "line_terminal": "A",
+              "neutral_terminal": "B"
+            }
+          ],
+          "geometrical_parameters": {
+            "shape": "spiral",
+            "block": 132,
+            "block_name": "tripwire"
+          },
+          "pins": {
+            "inout": "A:B"
+          }
+        }
+      }
+    },
+    "capacity": {
+      "id": "E3",
+      "name": "Ёмкость (резервуар воды)",
+      "connections": [
+        {
+          "type": "inside",
+          "to": "aqua (V2)",
+          "process": "GA -> GB",
+          "process_ref": "process_5 (преобразование)",
+          "physical_laws": "I*I*T*R -> Q",
+          "law_ref": "law_2 (Джоуль-Ленц)"
+        },
+        {
+          "type": "inside",
+          "to": "spiral (E2)",
+          "process": "GA +",
+          "process_ref": "process_1 (излучение)",
+          "physical_laws": "S_l = alpha * l_1",
+          "law_ref": "law_71 (Фурье)"
+        }
+      ],
+      "geometrical_parameters": {
+        "shape": "sphere",
+        "block": 41,
+        "block_name": "gold"
+      },
+      "ports": {
+        "hole": "A"
+      }
+    },
+    "hull": {
+      "id": "E4",
+      "name": "Корпус",
+      "connections": [
+        {
+          "type": "around",
+          "to": "environment (V3)",
+          "process": "GA1 > GA2",
+          "process_ref": "process_6 (увеличение)",
+          "physical_laws": "S_l = alpha * l_1",
+          "law_ref": "law_71 (Фурье)"
+        },
+        {
+          "type": "attach",
+          "to": "table (V4)",
+          "process": "GA -> GB",
+          "process_ref": "process_5 (преобразование)",
+          "physical_laws": "E4(F)->V4(-F)"
+        },
+        {
+          "type": "inside",
+          "to": [
+            "refractory (E5)",
+            "capacity (E3)"
+          ],
+          "process": "GA -> GB",
+          "process_ref": "process_5 (преобразование)",
+          "physical_laws": "E3(F)->E4(-F):E5(F)->E4(-F)"
+        }
+      ],
+      "geometrical_parameters": {
+        "shape": "sphere",
+        "block": 42,
+        "block_name": "iron"
+      },
+      "ports": {
+        "hole": "A"
+      }
+    },
+    "refractory": {
+      "id": "E5",
+      "name": "Теплоизолятор (огнеупор)",
+      "connections": [
+        {
+          "type": "attach",
+          "to": "spiral (E2)"
+        }
+      ],
+      "geometrical_parameters": {
+        "shape": "box0",
+        "block": 172,
+        "block_name": "hardened_clay",
+        "width": 1,
+        "height": 1,
+        "depth": 1
+      },
+      "pins": {
+        "input": "A:B:C",
+        "output": "A:B:C",
+        "inout": "A:B:C"
+      }
+    }
+  },
+  "connection_matrix": {
+    "description": "Матрица связей Крона — сочленения между подсистемами",
+    "topology": {
+      "V1_E1_E0_E2": "Электрическая сеть -> Провод -> Вилка -> Спираль",
+      "E2_E5_E4": "Спираль -> Теплоизолятор -> Корпус",
+      "E2_E3_V2": "Спираль -> Ёмкость -> Вода",
+      "E4_V3": "Корпус -> Окружающая среда",
+      "E4_V4": "Корпус -> Стол"
+    },
+    "energy_flow": "V1(electric) -> E1 -> E0 -> E2 -> E3(thermal) -> V2(aqua) | E4 -> V3(environment)"
+  }
+}

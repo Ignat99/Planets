@@ -1,0 +1,801 @@
+{
+  "_metadata": {
+    "description": "Физические среды (блоки) с привязкой к законам Плотникова",
+    "source": "ScriptCraft physical-medium-blocks.js",
+    "system": "СФВ Плотникова Н.А.",
+    "physical_law_ref": "physical_laws.json (law_N)",
+    "block_id_format": "number или number:data (Minecraft ID)",
+    "physical_law_format": " colon-separated law indices",
+    "colorized_blocks": [
+      "wool",
+      "stained_clay",
+      "carpet"
+    ],
+    "colors": [
+      "orange",
+      "magenta",
+      "lightblue",
+      "yellow",
+      "lime",
+      "pink",
+      "gray",
+      "lightgray",
+      "cyan",
+      "purple",
+      "blue",
+      "brown",
+      "green",
+      "red",
+      "black"
+    ],
+    "total_blocks": 227,
+    "blocks_with_physical_laws": 19
+  },
+  "blocks": {
+    "air": {
+      "number": 0,
+      "physical_law": "24:53:54:57:58:59:64:67:71:79:82:83:85:86"
+    },
+    "stone": {
+      "number": 1,
+      "physical_law": "11:18:25:30:65:71:73:75:79:82:83"
+    },
+    "grass": {
+      "number": 2,
+      "physical_law": "11:22:25:30:52:54:65:66:67:68:69:71:73:75:82:83"
+    },
+    "dirt": {
+      "number": 3,
+      "physical_law": "9:10:11:19:22:25:30:52:54:65:66:67:68:69:71:73:75:82:83",
+      "notes": "10:19 only for a very thin layer"
+    },
+    "cobblestone": {
+      "number": 4,
+      "physical_law": "11:18:25:30:65:71:73:75:79:82:83"
+    },
+    "oak": {
+      "number": 5
+    },
+    "spruce": {
+      "number": "5:1"
+    },
+    "birch": {
+      "number": "5:2"
+    },
+    "jungle": {
+      "number": "5:3"
+    },
+    "sapling": {
+      "oak": {
+        "number": 6
+      },
+      "spruce": {
+        "number": "6:1"
+      },
+      "birch": {
+        "number": "6:2"
+      },
+      "jungle": {
+        "number": "6:3"
+      }
+    },
+    "bedrock": {
+      "number": 7,
+      "physical_law": "30:65:69:73:75:79:82"
+    },
+    "water": {
+      "number": 8,
+      "physical_law": "1:2:9:18:26:30:39:65:67:68:70:71:75:79:82:83:85:86"
+    },
+    "water_still": {
+      "number": 9,
+      "physical_law": "9:18:26:30:39:52:54:65:66:67:68:70:71:75:79:82:83:85:86",
+      "notes": "distilled"
+    },
+    "lava": {
+      "number": 10
+    },
+    "lava_still": {
+      "number": 11
+    },
+    "sand": {
+      "number": 12
+    },
+    "gravel": {
+      "number": 13
+    },
+    "gold_ore": {
+      "number": 14
+    },
+    "iron_ore": {
+      "number": 15,
+      "physical_law": "11:13:14:15:17:18:19:20:21:23:24:25:26:27:28:30:31:32:33:37:39:40:42:44:45:46:47:50:51:52:54:56:61:62:65:66:69:71:72:73:75:76:79:82:83:86",
+      "notes": "31:32:33:50:66:76 only for a very thin layer; 42:46:47:62 after ter remelting"
+    },
+    "coal_ore": {
+      "number": 16
+    },
+    "wood": {
+      "number": 17,
+      "physical_law": "9:18:25:30:37:65:67:69:71:73:75:79:82:83"
+    },
+    "leaves": {
+      "number": 18,
+      "physical_law": "9:11:19:22:25:30:52:54:65:66:67:68:69:71:73:75:82:83"
+    },
+    "sponge": {
+      "number": 19,
+      "physical_law": "11:30:52:54:71:73:75:79:82:83"
+    },
+    "glass": {
+      "number": 20,
+      "physical_law": "52:54:65:67:68:70:71:73:75:77:79:82:83"
+    },
+    "lapis_lazuli_ore": {
+      "number": 21
+    },
+    "lapis_lazuli_block": {
+      "number": 22,
+      "physical_law": "11:14:24:25:26:42:62:67:68:75:77:85"
+    },
+    "dispenser": {
+      "number": 23
+    },
+    "sandstone": {
+      "number": 24
+    },
+    "note": {
+      "number": 25
+    },
+    "bed": {
+      "number": 26
+    },
+    "powered_rail": {
+      "number": 27
+    },
+    "detector_rail": {
+      "number": 28
+    },
+    "sticky_piston": {
+      "number": 29
+    },
+    "cobweb": {
+      "number": 30
+    },
+    "grass_tall": {
+      "number": 31
+    },
+    "dead_bush": {
+      "number": 32
+    },
+    "piston": {
+      "number": 33
+    },
+    "piston_extn": {
+      "number": 34
+    },
+    "wool": {
+      "white": {
+        "number": 35
+      },
+      "orange": {
+        "number": "35:1"
+      },
+      "magenta": {
+        "number": "35:2"
+      },
+      "lightblue": {
+        "number": "35:3"
+      },
+      "yellow": {
+        "number": "35:4"
+      },
+      "lime": {
+        "number": "35:5"
+      },
+      "pink": {
+        "number": "35:6"
+      },
+      "gray": {
+        "number": "35:7"
+      },
+      "lightgray": {
+        "number": "35:8"
+      },
+      "cyan": {
+        "number": "35:9"
+      },
+      "purple": {
+        "number": "35:10"
+      },
+      "blue": {
+        "number": "35:11"
+      },
+      "brown": {
+        "number": "35:12"
+      },
+      "green": {
+        "number": "35:13"
+      },
+      "red": {
+        "number": "35:14"
+      },
+      "black": {
+        "number": "35:15"
+      }
+    },
+    "dandelion": {
+      "number": 37
+    },
+    "flower_yellow": {
+      "number": 37
+    },
+    "rose": {
+      "number": 38
+    },
+    "flower_red": {
+      "number": 38
+    },
+    "mushroom_brown": {
+      "number": 39
+    },
+    "mushroom_red": {
+      "number": 40
+    },
+    "gold": {
+      "number": 41,
+      "physical_law": "1:2:4:6:7:9:11:12:16:19:22:25:30:34:35:36:37:38:39:40:43:55:65:69:71:73:74:75:76:82"
+    },
+    "iron": {
+      "number": 42
+    },
+    "tnt": {
+      "number": 46
+    },
+    "bookshelf": {
+      "number": 47
+    },
+    "moss_stone": {
+      "number": 48
+    },
+    "obsidian": {
+      "number": 49,
+      "physical_law": "11:25:26:30:52:54:65:67:70:71:73:75:77:79:82:83",
+      "light_absorption": "680:670:660:650:635:595:555:500"
+    },
+    "torch": {
+      "number": 50
+    },
+    "fire": {
+      "number": 51,
+      "physical_law": "24:34:35:53:54:57:58:59:64:66:67:71:82:83:85:86"
+    },
+    "monster_spawner": {
+      "number": 52
+    },
+    "stairs": {
+      "oak": {
+        "number": 53
+      },
+      "cobblestone": {
+        "number": 67
+      },
+      "brick": {
+        "number": 108
+      },
+      "stone": {
+        "number": 109
+      },
+      "nether": {
+        "number": 114
+      },
+      "sandstone": {
+        "number": 128
+      },
+      "spruce": {
+        "number": 134
+      },
+      "birch": {
+        "number": 135
+      },
+      "jungle": {
+        "number": 136
+      },
+      "quartz": {
+        "number": 156
+      }
+    },
+    "chest": {
+      "number": 54
+    },
+    "redstone_wire": {
+      "number": 55,
+      "physical_law": "1:2:4:6:7:8:9:10:12:16:19:22:34:35:36:37:38:39:40:49:55:65:74:76"
+    },
+    "diamond_ore": {
+      "number": 56
+    },
+    "diamond": {
+      "number": 57
+    },
+    "crafting_table": {
+      "number": 58
+    },
+    "wheat_seeds": {
+      "number": 59
+    },
+    "farmland": {
+      "number": 60
+    },
+    "furnace": {
+      "number": 61
+    },
+    "furnace_burning": {
+      "number": 62
+    },
+    "sign_post": {
+      "number": 63
+    },
+    "door_wood": {
+      "number": 64
+    },
+    "ladder": {
+      "number": 65
+    },
+    "rail": {
+      "number": 66
+    },
+    "sign": {
+      "number": 68
+    },
+    "lever": {
+      "number": 69
+    },
+    "pressure_plate_stone": {
+      "number": 70
+    },
+    "door_iron": {
+      "number": 71
+    },
+    "pressure_plate_wood": {
+      "number": 72
+    },
+    "redstone_ore": {
+      "number": 73
+    },
+    "redstone_ore_glowing": {
+      "number": 74
+    },
+    "torch_redstone": {
+      "number": 75
+    },
+    "torch_redstone_active": {
+      "number": 76
+    },
+    "stone_button": {
+      "number": 77
+    },
+    "ice": {
+      "number": 79
+    },
+    "snow": {
+      "number": 80
+    },
+    "cactus": {
+      "number": 81
+    },
+    "clay": {
+      "number": 82
+    },
+    "sugar_cane": {
+      "number": 83
+    },
+    "jukebox": {
+      "number": 84
+    },
+    "fence": {
+      "number": 85
+    },
+    "pumpkin": {
+      "number": 86
+    },
+    "netherrack": {
+      "number": 87
+    },
+    "soulsand": {
+      "number": 88
+    },
+    "glowstone": {
+      "number": 89
+    },
+    "netherportal": {
+      "number": 90
+    },
+    "jackolantern": {
+      "number": 91
+    },
+    "cake": {
+      "number": 92
+    },
+    "redstone_repeater": {
+      "number": 93
+    },
+    "redeston_repeater_active": {
+      "number": 94
+    },
+    "chest_locked": {
+      "number": 95
+    },
+    "trapdoor": {
+      "number": 96
+    },
+    "monster_egg": {
+      "number": 97
+    },
+    "brick": {
+      "stone": {
+        "number": 98
+      },
+      "mossy": {
+        "number": "98:1"
+      },
+      "cracked": {
+        "number": "98:2"
+      },
+      "chiseled": {
+        "number": "98:3"
+      },
+      "red": {
+        "number": 45
+      }
+    },
+    "mushroom_brown_huge": {
+      "number": 99
+    },
+    "mushroom_red_huge": {
+      "number": 100
+    },
+    "iron_bars": {
+      "number": 101
+    },
+    "glass_pane": {
+      "number": 102
+    },
+    "melon": {
+      "number": 103
+    },
+    "pumpkin_stem": {
+      "number": 104
+    },
+    "melon_stem": {
+      "number": 105
+    },
+    "vines": {
+      "number": 106
+    },
+    "fence_gate": {
+      "number": 107
+    },
+    "mycelium": {
+      "number": 110
+    },
+    "lily_pad": {
+      "number": 111
+    },
+    "nether": {
+      "number": 112
+    },
+    "nether_fence": {
+      "number": 113
+    },
+    "netherwart": {
+      "number": 115
+    },
+    "table_enchantment": {
+      "number": 116
+    },
+    "brewing_stand": {
+      "number": 117
+    },
+    "cauldron": {
+      "number": 118
+    },
+    "endportal": {
+      "number": 119
+    },
+    "endportal_frame": {
+      "number": 120
+    },
+    "endstone": {
+      "number": 121
+    },
+    "dragon_egg": {
+      "number": 122
+    },
+    "redstone_lamp": {
+      "number": 123
+    },
+    "redstone_lamp_active": {
+      "number": 124
+    },
+    "slab": {
+      "snow": {
+        "number": 78
+      },
+      "stone": {
+        "number": 44
+      },
+      "sandstone": {
+        "number": "44:1"
+      },
+      "wooden": {
+        "number": "44:2"
+      },
+      "cobblestone": {
+        "number": "44:3"
+      },
+      "brick": {
+        "number": "44:4"
+      },
+      "stonebrick": {
+        "number": "44:5"
+      },
+      "netherbrick": {
+        "number": "44:6"
+      },
+      "quartz": {
+        "number": "44:7"
+      },
+      "oak": {
+        "number": 126
+      },
+      "spruce": {
+        "number": "126:1"
+      },
+      "birch": {
+        "number": "126:2"
+      },
+      "jungle": {
+        "number": "126:3"
+      },
+      "upper": {
+        "stone": {
+          "number": "44:8"
+        },
+        "sandstone": {
+          "number": "44:9"
+        },
+        "wooden": {
+          "number": "44:10"
+        },
+        "cobblestone": {
+          "number": "44:11"
+        },
+        "brick": {
+          "number": "44:12"
+        },
+        "stonebrick": {
+          "number": "44:13"
+        },
+        "netherbrick": {
+          "number": "44:14"
+        },
+        "quartz": {
+          "number": "44:15"
+        },
+        "oak": {
+          "number": "126:8"
+        },
+        "spruce": {
+          "number": "126:9"
+        },
+        "birch": {
+          "number": "126:10"
+        },
+        "jungle": {
+          "number": "126:11"
+        }
+      }
+    },
+    "cocoa": {
+      "number": 127
+    },
+    "emerald_ore": {
+      "number": 129
+    },
+    "enderchest": {
+      "number": 130
+    },
+    "tripwire_hook": {
+      "number": 131
+    },
+    "tripwire": {
+      "number": 132
+    },
+    "emerald": {
+      "number": 133
+    },
+    "command": {
+      "number": 137
+    },
+    "beacon": {
+      "number": 138
+    },
+    "cobblestone_wall": {
+      "number": 139
+    },
+    "flowerpot": {
+      "number": 140
+    },
+    "carrots": {
+      "number": 141
+    },
+    "potatoes": {
+      "number": 142
+    },
+    "button_wood": {
+      "number": 143
+    },
+    "mobhead": {
+      "number": 144
+    },
+    "anvil": {
+      "number": 145
+    },
+    "chest_trapped": {
+      "number": 146
+    },
+    "pressure_plate_weighted_light": {
+      "number": 147
+    },
+    "pressure_plate_weighted_heavy": {
+      "number": 148
+    },
+    "redstone_comparator": {
+      "number": 149
+    },
+    "redstone_comparator_active": {
+      "number": 150
+    },
+    "daylight_sensor": {
+      "number": 151
+    },
+    "redstone": {
+      "number": 152
+    },
+    "netherquartzore": {
+      "number": 153
+    },
+    "hopper": {
+      "number": 154
+    },
+    "quartz": {
+      "number": 155
+    },
+    "rail_activator": {
+      "number": 157
+    },
+    "dropper": {
+      "number": 158
+    },
+    "stained_clay": {
+      "white": {
+        "number": 159
+      },
+      "orange": {
+        "number": "159:1"
+      },
+      "magenta": {
+        "number": "159:2"
+      },
+      "lightblue": {
+        "number": "159:3"
+      },
+      "yellow": {
+        "number": "159:4"
+      },
+      "lime": {
+        "number": "159:5"
+      },
+      "pink": {
+        "number": "159:6"
+      },
+      "gray": {
+        "number": "159:7"
+      },
+      "lightgray": {
+        "number": "159:8"
+      },
+      "cyan": {
+        "number": "159:9"
+      },
+      "purple": {
+        "number": "159:10"
+      },
+      "blue": {
+        "number": "159:11"
+      },
+      "brown": {
+        "number": "159:12"
+      },
+      "green": {
+        "number": "159:13"
+      },
+      "red": {
+        "number": "159:14"
+      },
+      "black": {
+        "number": "159:15"
+      }
+    },
+    "hay": {
+      "number": 170
+    },
+    "carpet": {
+      "white": {
+        "number": 171
+      },
+      "orange": {
+        "number": "171:1"
+      },
+      "magenta": {
+        "number": "171:2"
+      },
+      "lightblue": {
+        "number": "171:3"
+      },
+      "yellow": {
+        "number": "171:4"
+      },
+      "lime": {
+        "number": "171:5"
+      },
+      "pink": {
+        "number": "171:6"
+      },
+      "gray": {
+        "number": "171:7"
+      },
+      "lightgray": {
+        "number": "171:8"
+      },
+      "cyan": {
+        "number": "171:9"
+      },
+      "purple": {
+        "number": "171:10"
+      },
+      "blue": {
+        "number": "171:11"
+      },
+      "brown": {
+        "number": "171:12"
+      },
+      "green": {
+        "number": "171:13"
+      },
+      "red": {
+        "number": "171:14"
+      },
+      "black": {
+        "number": "171:15"
+      }
+    },
+    "hardened_clay": {
+      "number": 172,
+      "physical_law": "52:54:65:71:73:75:79:82:83"
+    },
+    "coal_block": {
+      "number": 173
+    },
+    "rainbow": [
+      "35:14",
+      "35:1",
+      "35:4",
+      "35:5",
+      "35:3",
+      "35:11",
+      "35:10"
+    ]
+  }
+}
