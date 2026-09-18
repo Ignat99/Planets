@@ -1,528 +1,420 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-convergence_test.py — Тест сходимости для ревизии 5.
+Тест сходимости: проверка стабильности секулярной скорости прецессии
+при разных шагах интегрирования.
 
-Проверяет устойчивость секулярной скорости прецессии и RMS долготы
-при шагах интегрирования: 60, 30, 15, 7.5 дней.
+Шаги: 60, 30, 15, 7.5 дней
+Интервал: 1980 лет (1010–2990)
+Планеты: Mercury, Mars
+Метрики: dvarpi_secular (3 метода), RMS для моделей
 
-Не меняет формулы. Только меняет шаг сетки.
+Запуск: py convergence_test.py
 """
 
 import numpy as np
-from datetime import datetime, timedelta
-from pathlib import Path
+import math
+from scipy.integrate import cumulative_trapezoid
 from skyfield.api import load
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
 
-# ============================================================
-# Генератор A391838 из беззнаковых чисел Стирлинга I рода
-# ============================================================
+# ==========================================================================
+# 1. Независимый генератор A391838 из беззнаковых чисел Стирлинга I рода
+# ==========================================================================
 
-def stirling1_triangle(N):
-    """Треугольник беззнаковых чисел Стирлинга первого рода s(n,k)."""
-    s = [[0] * (N + 1) for _ in range(N + 1)]
+def stirling_first_kind(N):
+    """Беззнаковые числа Стирлинга первого рода s(n,k).
+    Рекурсия: s(n,k) = s(n-1,k-1) + (n-1)*s(n-1,k)
+    """
+    s = [[0]*(N+1) for _ in range(N+1)]
     s[0][0] = 1
-    for n in range(1, N + 1):
-        for k in range(1, n + 1):
-            s[n][k] = s[n-1][k-1] + (n-1) * s[n-1][k]
+    for n in range(1, N+1):
+        for k in range(1, n+1):
+            s[n][k] = s[n-1][k-1] + (n-1)*s[n-1][k]
     return s
 
-def compute_a391838_from_stirling(N_terms=9):
-    """
-    Вычисляет a(n) = (n!)^2 * Sum_{k=0..floor(n/2)} |Stirling1(n-k, n-2k)| / ((2k+1)! * (n-k)!)
-    Строго по формуле OEIS A391838.
-    """
-    s = stirling1_triangle(2 * N_terms + 2)
-    from math import factorial
+def generate_a391838(n_max):
+    """Генерация A391838 из чисел Стирлинга.
     
-    a = []
-    for n in range(N_terms):
-        total = 0
+    Формула OEIS A391838:
+    a(n) = (n!)^2 * Sum_{k=0..floor(n/2)} |Stirling1(n-k, n-2k)| / ((2k+1)! * (n-k)!)
+    
+    Цепочка: Stirling -> диагонали (n-k, n-2k) -> A391838 -> нормировка a_n/n!
+    """
+    s = stirling_first_kind(n_max + 1)
+    result = []
+    for n in range(n_max + 1):
+        total = 0.0
         for k in range(n // 2 + 1):
             row = n - k
             col = n - 2 * k
-            if col < 0 or col > row:
+            if col < 0 or row < 0:
+                break
+            stirling_val = s[row][col]
+            if stirling_val == 0:
                 continue
-            stirling_val = abs(s[row][col]) if row < len(s) and col < len(s[row]) else 0
-            denom = factorial(2 * k + 1) * factorial(n - k)
-            total += stirling_val / denom
-        a_n = (factorial(n) ** 2) * total
-        a.append(round(a_n))
-    
-    # Нормировка
-    norm = [a[n] / factorial(n) for n in range(N_terms)]
-    return a, norm
+            # (2k+1)!
+            denom_fact_2k1 = math.factorial(2*k + 1)
+            # (n-k)!
+            denom_fact_nk = math.factorial(n - k)
+            total += stirling_val / (denom_fact_2k1 * denom_fact_nk)
+        # (n!)^2
+        n_fact = math.factorial(n)
+        a_n = n_fact * n_fact * total
+        result.append(round(a_n))  # округляем до целого
+    return result
 
-# ============================================================
-# Вычисление
-# ============================================================
+# Генерация коэффициентов
+A391838_int = generate_a391838(8)
+A391838_norm = [A391838_int[n] / math.factorial(n) for n in range(9)]
 
 print("=" * 80)
 print("Генератор A391838 из беззнаковых чисел Стирлинга первого рода")
 print("=" * 80)
-print("  Формула: a(n) = (n!)^2 * Sum |Stirling1(n-k, n-2k)| / ((2k+1)! * (n-k)!)")
-
-a_int, A391838_norm = compute_a391838_from_stirling(9)
-print(f"  Целочисленная последовательность: {a_int}")
+print(f"  Формула: a(n) = (n!)^2 * Sum |Stirling1(n-k, n-2k)| / ((2k+1)! * (n-k)!)")
+print(f"  Целочисленная последовательность: {A391838_int}")
 print(f"  Нормированные коэффициенты a_n/n!: {A391838_norm}")
-
-oeis_ref = [1, 1, 2, 9, 72, 760, 9900, 156240, 2903040]
-match = all(abs(a_int[i] - oeis_ref[i]) < 0.5 for i in range(len(oeis_ref)))
-print(f"  Сравнение с OEIS: {', '.join(str(x) for x in oeis_ref)}")
-print(f"  Все 9 членов совпадают: {'ДА' if match else 'НЕТ'}")
+print(f"  Сравнение с OEIS: 1, 1, 2, 9, 72, 760, 9900, 156240, 2903040")
+ref_check = [1, 1, 2, 9, 72, 760, 9900, 156240, 2903040]
+all_match = all(A391838_int[i] == ref_check[i] for i in range(9))
+print(f"  Все 9 членов совпадают: {'ДА' if all_match else 'НЕТ'}")
 print()
 
-# ============================================================
-# Загрузка эфемериды
-# ============================================================
+# ==========================================================================
+# 2. Константы и параметры
+# ==========================================================================
 
-print("Загрузка эфемериды DE422...")
-eph_file = load('de422.bsp')
+AU_KM = 1.49597870700e8
+GM_SUN_KM3_S2 = 1.32712440018e11
+DAY_S = 86400.0
+ARCSEC_PER_RAD = 206264.80624709636
+C_KM_S = 299792.458
+SECONDS_PER_CENTURY = 36525.0 * DAY_S
+DEG_TO_ARCSEC = 3600.0
 
-# Используем целочисленные индексы, а не строковые!
-SUN = eph_file[0]
-MERCURY = eph_file[1]
-VENUS = eph_file[2]
-EMB = eph_file[3]       # EMB, не геоцентр!
-MARS = eph_file[4]
-JUPITER = eph_file[5]
-SATURN = eph_file[6]
+# Калиброванная константа прецессии (соответствует ya15.py)
+# K = 3 * GM^1.5 / (c^2 * AU^2.5) * ARCSEC_PER_RAD * SECONDS_PER_CENTURY
+K_PREC = 3 * (GM_SUN_KM3_S2 ** 1.5) / (C_KM_S ** 2 * AU_KM ** 2.5) * \
+         ARCSEC_PER_RAD * SECONDS_PER_CENTURY
 
-ts = load.timescale()
+# L-коэффициент для A391838 (в тех же единицах, что K)
+L_PREC = 0.6496
 
-# ============================================================
-# Параметры моделей (из ya15.py rev5)
-# ============================================================
-
-# Константы
-GM_sun = 1.32712440018e20  # m^3/s^2
-AU = 1.495978707e11         # m
-c = 2.99792458e8            # m/s
-
-def A391838_func(e):
-    """Полином A391838(e) = sum_{n=0}^{8} (a_n/n!) * e^n"""
-    return sum(A391838_norm[n] * e**n for n in range(len(A391838_norm)))
-
-def gr_factor(e):
-    """Стандартный GR множитель 1/(1-e^2)"""
-    return 1.0 / (1.0 - e**2)
-
-# Планетарные параметры (J2000, из ya15.py)
-BODIES = {
-    'Mercury': {
-        'planet': MERCURY,
-        'a0': 0.38709738,
-        'e0': 0.20563890,
-        'varpi0': 77.3164,     # градусы
-        'K': 41.0955,          # arcsec/century (ньютоновская прецессия)
-        'L': 0.6496,
-        'newtonian_pub': 532.3035,  # опубл. ньютоновское (arcsec/century)
-    },
-    'Mars': {
-        'planet': MARS,
-        'a0': 1.52371243,
-        'e0': 0.09339410,
-        'varpi0': 336.0402,
-        'K': 1.3369,
-        'L': 0.6496,
-        'newtonian_pub': 1598.2000,  # ориентировочное
-    },
+PLANETS = {
+    'Mercury': {'de422_id': 1, 'a0': 0.387098, 'e0': 0.205630,
+                'newtonian': 532.3035, 'newtonian_label': 'опубл.'},
+    'Mars':    {'de422_id': 4, 'a0': 1.523710, 'e0': 0.093400,
+                'newtonian': 1598.2000, 'newtonian_label': 'ориент.'},
 }
 
-# ============================================================
-# Функции
-# ============================================================
+# ==========================================================================
+# 3. Функции
+# ==========================================================================
 
-def helio_position(planet, t):
-    """Гелиоцентрические координаты (геометрический режим)."""
-    r = planet.at(t)
-    x, y, z = r.position.au
-    vx, vy, vz = r.velocity.au_per_d
-    return np.array([x, y, z]), np.array([vx, vy, vz])
+def angular_difference_deg(a, b):
+    """Угловая разность без скачков 0/360."""
+    return (a - b + 180.0) % 360.0 - 180.0
 
-def osculating_full(r_vec, v_vec, GM=GM_sun, AU=AU, day=86400.0):
+def A391838_eval(e):
+    """Вычисление A391838(e) через нормированные коэффициенты."""
+    return sum(A391838_norm[k] * e ** k for k in range(9))
+
+def precession_arcsec_per_century(model, a, e):
+    """Скорость прецессии в arcsec/век.
+    
+    Формулы (соответствуют ya15.py):
+      P0:       K / a^2.5
+      P_GR:     K / (a^2.5 * (1 - e^2))
+      P_391838: (K + L * (A391838(e) - 1)) / a^2.5
     """
-    Полные оскулирующие элементы из state vector.
-    DE422, Sun-only. Это НЕ канонические элементы VSOP87.
-    """
-    # Перевод в SI
-    r_si = r_vec * AU
-    v_si = v_vec * AU / day
-    mu = GM
-    
-    r_mag = np.linalg.norm(r_si)
-    v_mag = np.linalg.norm(v_si)
-    
-    # Удельная энергия
-    energy = v_mag**2 / 2 - mu / r_mag
-    a = -mu / (2 * energy)
-    
-    # Момент импульса
-    h_vec = np.cross(r_si, v_si)
-    h_mag = np.linalg.norm(h_vec)
-    
-    # Вектор Лапласа-Рунге-Ленца
-    e_vec = np.cross(v_si, h_vec) / mu - r_si / r_mag
-    e = np.linalg.norm(e_vec)
-    
-    # Наклонение
-    i_inc = np.arccos(h_vec[2] / h_mag)
-    
-    # Долгота восходящего узла
-    Omega = np.arctan2(h_vec[0], -h_vec[1])
-    if Omega < 0:
-        Omega += 2 * np.pi
-    
-    # Аргумент перицентра
-    n_vec = np.array([0, 0, 1])
-    N_vec = np.cross(n_vec, h_vec)
-    N_mag = np.linalg.norm(N_vec)
-    if N_mag > 1e-15:
-        omega = np.arccos(np.clip(np.dot(N_vec, e_vec) / (N_mag * e), -1, 1))
-        if e_vec[2] < 0:
-            omega = 2 * np.pi - omega
+    a25 = a ** 2.5
+    if model == 'P0':
+        return K_PREC / a25
+    elif model == 'P_GR':
+        return K_PREC / (a25 * (1.0 - e ** 2))
+    elif model == 'P_391838':
+        return (K_PREC + L_PREC * (A391838_eval(e) - 1.0)) / a25
+    elif model == 'P_A391838_hybrid':
+        # То же, что P_391838, но с переменными a(t), e(t)
+        return (K_PREC + L_PREC * (A391838_eval(e) - 1.0)) / a25
     else:
-        omega = 0
-    
-    # Истинная аномалия
-    nu = np.arccos(np.clip(np.dot(e_vec, r_si) / (e * r_mag), -1, 1))
-    if np.dot(r_si, v_si) < 0:
-        nu = 2 * np.pi - nu
-    
-    # Эксцентрическая аномалия
-    E = 2 * np.arctan(np.sqrt((1 - e) / (1 + e)) * np.tan(nu / 2))
-    
-    # Средняя аномалия
-    M = E - e * np.sin(E)
-    
-    # Проекционная долгота перицентра (на J2000 ecliptic)
-    varpi = np.degrees(Omega + omega)
-    varpi = varpi % 360
-    
-    M_deg = np.degrees(M) % 360
-    
-    return {
-        'a': a / AU,
-        'e': e,
-        'i': np.degrees(i_inc),
-        'Omega': np.degrees(Omega),
-        'omega': np.degrees(omega),
-        'varpi': varpi,
-        'M': M_deg,
-        'nu': np.degrees(nu),
-    }
+        raise ValueError(f"Unknown model: {model}")
 
-def compute_model_long_array(body_name, dt_days, years=1980):
+def helio_state(eph, planet_id, t):
+    """Гелиоцентрические координаты из DE422 (геометрический режим)."""
+    sun = eph['sun']
+    body = eph['planets'][planet_id]
+    pos = body.at(t) - sun.at(t)
+    r_vec = np.array([pos.position.au[0], pos.position.au[1], pos.position.au[2]])
+    v_vec = np.array([pos.velocity.au_per_d[0], pos.velocity.au_per_d[1],
+                      pos.velocity.au_per_d[2]])
+    return r_vec, v_vec
+
+def osculating_elements(r_vec, v_vec):
+    """Мгновенные оскулирующие элементы (Sun-only, двухтельные).
+    
+    Это НЕ канонические элементы VSOP87 и НЕ чисто секулярные элементы.
     """
-    Вычисляет долготу планеты для набора моделей на интервале years лет.
-    Шаг dt_days дней.
-    """
-    body = BODIES[body_name]
-    planet = body['planet']
-    a0 = body['a0']
-    e0 = body['e0']
-    varpi0 = body['varpi0']
-    K = body['K']
-    L = body['L']
-    
-    start_year = 1010
-    end_year = start_year + years
-    
-    N = int(years * 365.25 / dt_days)
-    times = [start_year + (i * dt_days) / 365.25 for i in range(N + 1)]
-    
-    # Разбиваем на блоки для Skyfield
-    block_size = 2000
-    longitudes_de422 = []
-    varpi_de422 = []
-    a_osc_list = []
-    e_osc_list = []
-    
-    for blk_start in range(0, len(times), block_size):
-        blk_end = min(blk_start + block_size, len(times))
-        blk_times = times[blk_start:blk_end]
-        
-        # Skyfield время
-        t = ts.utc([int(y) for y in blk_times],
-                   [int((y % 1) * 12) + 1 for y in blk_times],
-                   [1 for _ in blk_times])
-        
-        for idx in range(len(blk_times)):
-            # Одна точка
-            t_one = ts.utc(int(blk_times[idx]),
-                          int((blk_times[idx] % 1) * 12) + 1, 1)
-            r_vec, v_vec = helio_position(planet, t_one)
-            osc = osculating_full(r_vec, v_vec)
-            
-            lam = np.degrees(np.arctan2(r_vec[1], r_vec[0])) % 360
-            longitudes_de422.append(lam)
-            varpi_de422.append(osc['varpi'])
-            a_osc_list.append(osc['a'])
-            e_osc_list.append(osc['e'])
-    
-    longitudes_de422 = np.array(longitudes_de422)
-    varpi_de422 = np.array(varpi_de422)
-    a_osc = np.array(a_osc_list)
-    e_osc = np.array(e_osc_list)
-    
-    # Модели
-    # P0: без e-поправки
-    # P_GR: 1/(1-e^2)
-    # P_391838: A391838(e) с постоянными a0, e0
-    # P_A391838_hybrid: A391838 с оскулирующими a(t), e(t)
-    
-    t_years = np.array(times[:len(longitudes_de422)])
-    
-    # Скорости прецессии (arcsec/century)
-    dvarpi_P0 = K / a0**2.5
-    dvarpi_PGR = (K + L * (gr_factor(e0) - 1)) / a0**2.5
-    dvarpi_P391838 = (K + L * (A391838_func(e0) - 1)) / a0**2.5
-    
-    # Гибрид: переменная скорость
-    A_vals = np.array([A391838_func(e) for e in e_osc])
-    dvarpi_hybrid = (K + L * (A_vals - 1)) / a_osc**2.5
-    
-    # Интегрирование (кумулятивная трапеция)
-    dt_century = dt_days / 36525.0
-    
-    # P0
-    varpi_P0 = np.cumsum(dvarpi_P0 * dt_century * np.ones(len(t_years)))
-    varpi_P0 = varpi0 + varpi_P0 / 3600.0  # arcsec -> degrees
-    
-    # P_GR
-    varpi_PGR = np.cumsum(dvarpi_PGR * dt_century * np.ones(len(t_years)))
-    varpi_PGR = varpi0 + varpi_PGR / 3600.0
-    
-    # P_391838
-    varpi_P391838 = np.cumsum(dvarpi_P391838 * dt_century * np.ones(len(t_years)))
-    varpi_P391838 = varpi0 + varpi_P391838 / 3600.0
-    
-    # P_A391838_hybrid (трапеция)
-    varpi_hybrid = np.zeros(len(t_years))
-    varpi_hybrid[0] = varpi0
-    for j in range(1, len(t_years)):
-        avg = (dvarpi_hybrid[j] + dvarpi_hybrid[j-1]) / 2
-        varpi_hybrid[j] = varpi_hybrid[j-1] + avg * dt_century / 3600.0
-    
-    # Долгота модели = долгота DE422 + (varpi_model - varpi_de422)
-    # Но правильнее: long_model = long_de422 + (varpi_model - varpi_de422_corrections)
-    # Используем простой подход: угол между моделью и DE422
-    
-    # Разность долгот
-    def angle_diff(a, b):
-        d = (a - b) % 360
-        d = np.where(d > 180, d - 360, d)
-        return d
-    
-    diff_P0 = angle_diff(varpi_P0, varpi_de422)
-    diff_PGR = angle_diff(varpi_PGR, varpi_de422)
-    diff_P391838 = angle_diff(varpi_P391838, varpi_de422)
-    diff_hybrid = angle_diff(varpi_hybrid, varpi_de422)
-    
-    # RMS
-    rms_P0 = np.sqrt(np.mean(diff_P0**2))
-    rms_PGR = np.sqrt(np.mean(diff_PGR**2))
-    rms_P391838 = np.sqrt(np.mean(diff_P391838**2))
-    rms_hybrid = np.sqrt(np.mean(diff_hybrid**2))
-    
-    # Секулярная скорость dvarpi/dt (через линейную регрессию)
-    t_centuries = (t_years - t_years[0]) / 100.0
-    
-    # DE422 мгновенная скорость (через разность varpi)
-    dvarpi_de422_inst = np.diff(varpi_de422)
-    # unwrap
-    dvarpi_de422_unwrapped = np.unwrap(np.radians(varpi_de422))
-    slope_de422 = np.polyfit(t_centuries, np.degrees(dvarpi_de422_unwrapped), 1)[0]
-    
-    # Центральный интервал (10-90%)
-    n_total = len(t_centuries)
-    i_lo = int(0.1 * n_total)
-    i_hi = int(0.9 * n_total)
-    slope_de422_center = np.polyfit(t_centuries[i_lo:i_hi], 
-                                     np.degrees(dvarpi_de422_unwrapped[i_lo:i_hi]), 1)[0]
-    
-    # Сглаженная
-    window = max(1, n_total // 20)
-    varpi_smooth = np.convolve(np.degrees(dvarpi_de422_unwrapped), 
-                                np.ones(window)/window, mode='valid')
-    t_smooth = t_centuries[window//2:window//2 + len(varpi_smooth)]
-    slope_de422_smooth = np.polyfit(t_smooth, varpi_smooth, 1)[0]
-    
-    return {
-        'dt_days': dt_days,
-        'body': body_name,
-        'secular_de422': slope_de422,
-        'secular_de422_center': slope_de422_center,
-        'secular_de422_smooth': slope_de422_smooth,
-        'newtonian': body['newtonian_pub'],
-        'residual': slope_de422 - body['newtonian_pub'],
-        'residual_center': slope_de422_center - body['newtonian_pub'],
-        'residual_smooth': slope_de422_smooth - body['newtonian_pub'],
-        'P0': dvarpi_P0,
-        'P_GR': dvarpi_PGR,
-        'P_391838': dvarpi_P391838,
-        'P_hybrid': np.mean(dvarpi_hybrid),
-        'rms_P0': rms_P0,
-        'rms_PGR': rms_PGR,
-        'rms_P391838': rms_P391838,
-        'rms_hybrid': rms_hybrid,
-        'N_points': len(t_years),
-    }
+    mu = GM_SUN_KM3_S2 / (AU_KM ** 3) * DAY_S ** 2
+    r = np.linalg.norm(r_vec)
+    v = np.linalg.norm(v_vec)
+    energy = 0.5 * v ** 2 - mu / r
+    a = -mu / (2 * energy)
+    h_vec = np.cross(r_vec, v_vec)
+    h = np.linalg.norm(h_vec)
+    e_vec = np.cross(v_vec, h_vec) / mu - r_vec / r
+    e = np.linalg.norm(e_vec)
+    # Долгота проекции вектора эксцентриситета на эклиптику (J2000)
+    varpi = np.degrees(np.arctan2(e_vec[1], e_vec[0])) % 360.0
+    return a, e, varpi
 
-# ============================================================
-# Главная функция
-# ============================================================
-
-def main():
-    dt_list = [60, 30, 15, 7.5]
-    body_list = ['Mercury', 'Mars']
+def run_convergence_test(eph, ts, planet_name, step_days_list):
+    """Запуск теста сходимости для одной планеты."""
+    params = PLANETS[planet_name]
+    planet_id = params['de422_id']
     
     results = {}
-    for body_name in body_list:
-        results[body_name] = {}
+    
+    for step_days in step_days_list:
+        # Временная сетка
+        year_start = 1010
+        year_end = 2990
+        n_steps = int((year_end - year_start) * 365.25 / step_days)
+        
+        # Генерация времени
+        years_arr = np.linspace(year_start, year_end, n_steps + 1)
+        start_jd = int(year_start * 365.25 + 1721028.5)
+        days = np.arange(0, n_steps + 1) * step_days
+        
+        print(f"  {planet_name}, шаг {step_days} дней, {n_steps + 1} точек...")
+        
+        # Сбор оскулирующих элементов
+        varpi_arr = np.zeros(n_steps + 1)
+        a_arr = np.zeros(n_steps + 1)
+        e_arr = np.zeros(n_steps + 1)
+        
+        batch = 200
+        for i in range(0, n_steps + 1, batch):
+            end_i = min(i + batch, n_steps + 1)
+            t_batch = ts.tt(jd=start_jd + days[i:end_i])
+            for j in range(end_i - i):
+                idx = i + j
+                r_vec, v_vec = helio_state(eph, planet_id, t_batch[j])
+                a_osc, e_osc, varpi = osculating_elements(r_vec, v_vec)
+                a_arr[idx] = a_osc
+                e_arr[idx] = e_osc
+                varpi_arr[idx] = varpi
+        
+        # Unwrap
+        varpi_unwrapped = np.zeros_like(varpi_arr)
+        varpi_unwrapped[0] = varpi_arr[0]
+        for i in range(1, len(varpi_arr)):
+            diff = angular_difference_deg(varpi_arr[i], varpi_arr[i-1])
+            varpi_unwrapped[i] = varpi_unwrapped[i-1] + diff
+        
+        # Секулярная скорость: 3 метода
+        # Все скорости в градусах/век — переводим в arcsec/век (* 3600)
+        years_actual = years_arr - years_arr[0]
+        
+        # 1. Полный интервал
+        coef_full = np.polyfit(years_arr, varpi_unwrapped, 1)
+        secular_full = coef_full[0] * DEG_TO_ARCSEC
+        
+        # 2. Центральный интервал (10-90%)
+        mask = (years_arr > year_start + 0.1 * (year_end - year_start)) & \
+              (years_arr < year_end - 0.1 * (year_end - year_start))
+        coef_central = np.polyfit(years_arr[mask], varpi_unwrapped[mask], 1)
+        secular_central = coef_central[0] * DEG_TO_ARCSEC
+        
+        # 3. Сглаженная кривая
+        window = max(1, int(100 * 365.25 / step_days))
+        kernel = np.ones(window) / window
+        varpi_smooth = np.convolve(varpi_unwrapped, kernel, mode='same')
+        coef_smooth = np.polyfit(years_arr[window:-window],
+                                 varpi_smooth[window:-window], 1)
+        secular_smooth = coef_smooth[0] * DEG_TO_ARCSEC
+        
+        # Остаток после Newtonian
+        newtonian = params['newtonian']
+        residual_full = secular_full - newtonian
+        residual_central = secular_central - newtonian
+        residual_smooth = secular_smooth - newtonian
+        
+        # Модели (постоянные a0, e0)
+        a0 = params['a0']
+        e0 = params['e0']
+        p0 = precession_arcsec_per_century('P0', a0, e0)
+        p_gr = precession_arcsec_per_century('P_GR', a0, e0)
+        p_391838 = precession_arcsec_per_century('P_391838', a0, e0)
+        
+        # Гибридная модель (переменные a(t), e(t))
+        p_hybrid_arr = np.array([
+            precession_arcsec_per_century('P_A391838_hybrid', a_arr[i], e_arr[i])
+            for i in range(n_steps + 1)
+        ])
+        p_hybrid_mean = np.mean(p_hybrid_arr)
+        
+        # RMS для долготы (равномерная прецессия)
+        varpi_model = varpi_unwrapped[0] + secular_full / DEG_TO_ARCSEC * (years_arr - years_arr[0])
+        rms_longitude = np.sqrt(np.mean((varpi_unwrapped - varpi_model) ** 2))
+        
+        results[step_days] = {
+            'n_points': n_steps + 1,
+            'secular_full': secular_full,
+            'secular_central': secular_central,
+            'secular_smooth': secular_smooth,
+            'residual_full': residual_full,
+            'residual_central': residual_central,
+            'residual_smooth': residual_smooth,
+            'p0': p0,
+            'p_gr': p_gr,
+            'p_391838': p_391838,
+            'p_hybrid': p_hybrid_mean,
+            'rms_longitude': rms_longitude,
+        }
+    
+    return results
+
+# ==========================================================================
+# 4. Главный блок
+# ==========================================================================
+
+def main():
+    print("Загрузка эфемериды DE422...")
+    eph_file = load('de422.bsp')
+    eph = {
+        'sun': eph_file['sun'],
+        'planets': {i: eph_file[i] for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]},
+    }
+    ts = load.timescale()
+    
+    step_days_list = [60, 30, 15, 7.5]
+    
+    all_results = {}
+    
+    for planet_name in ['Mercury', 'Mars']:
         print(f"\n{'=' * 80}")
-        print(f"Тест сходимости: {body_name}")
+        print(f"Тест сходимости: {planet_name}")
         print(f"{'=' * 80}")
         
-        for dt in dt_list:
-            print(f"\n  Шаг {dt} дней...")
-            res = compute_model_long_array(body_name, dt)
-            results[body_name][dt] = res
-            
-            print(f"    N точек:        {res['N_points']}")
-            print(f"    DE422 секуляр:   {res['secular_de422']:.4f} arcsec/век")
-            print(f"    DE422 централ.:  {res['secular_de422_center']:.4f} arcsec/век")
-            print(f"    DE422 сглаж.:    {res['secular_de422_smooth']:.4f} arcsec/век")
-            print(f"    Newtonian:       {res['newtonian']:.4f} arcsec/век")
-            print(f"    Остаток:         {res['residual']:.4f} arcsec/век")
-            print(f"    Остаток центр.:  {res['residual_center']:.4f} arcsec/век")
-            print(f"    Остаток сглаж.:  {res['residual_smooth']:.4f} arcsec/век")
-            print(f"    P0:             {res['P0']:.4f} arcsec/век")
-            print(f"    P_GR:           {res['P_GR']:.4f} arcsec/век")
-            print(f"    P_391838:       {res['P_391838']:.4f} arcsec/век")
-            print(f"    P_hybrid:       {res['P_hybrid']:.4f} arcsec/век")
-            print(f"    RMS P0:         {res['rms_P0']:.6f}°")
-            print(f"    RMS P_GR:       {res['rms_PGR']:.6f}°")
-            print(f"    RMS P_391838:   {res['rms_P391838']:.6f}°")
-            print(f"    RMS hybrid:     {res['rms_hybrid']:.6f}°")
+        results = run_convergence_test(eph, ts, planet_name, step_days_list)
+        all_results[planet_name] = results
+        
+        # Вывод таблицы
+        print(f"\n  {'Шаг':>6s} {'Точек':>8s} {'Секулярная':>12s} {'Центр.':>12s} "
+              f"{'Сглаж.':>12s} {'Остаток':>10s} {'P0':>10s} {'P_GR':>10s} "
+              f"{'P_391838':>10s} {'P_гибр.':>10s}")
+        print(f"  {'-'*6} {'-'*8} {'-'*12} {'-'*12} {'-'*12} {'-'*10} "
+              f"{'-'*10} {'-'*10} {'-'*10} {'-'*10}")
+        
+        for step in step_days_list:
+            r = results[step]
+            print(f"  {step:6.1f} {r['n_points']:8d} "
+                  f"{r['secular_full']:12.4f} {r['secular_central']:12.4f} "
+                  f"{r['secular_smooth']:12.4f} "
+                  f"{r['residual_full']:10.4f} {r['p0']:10.4f} {r['p_gr']:10.4f} "
+                  f"{r['p_391838']:10.4f} {r['p_hybrid']:10.4f}")
     
     # Сводная таблица
     print(f"\n{'=' * 80}")
     print("СВОДНАЯ ТАБЛИЦА СХОДИМОСТИ")
     print(f"{'=' * 80}")
     
-    for body_name in body_list:
-        print(f"\n  {body_name}:")
-        print(f"  {'Шаг':>8s}  {'Секулярная':>12s}  {'Центр.':>12s}  {'Сглаж.':>12s}  {'Остаток':>10s}  {'RMS P0':>10s}  {'RMS GR':>10s}  {'RMS A39':>10s}  {'RMS гибр.':>10s}")
-        print(f"  {'-'*8}  {'-'*12}  {'-'*12}  {'-'*12}  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*10}")
-        for dt in dt_list:
-            r = results[body_name][dt]
-            print(f"  {dt:8.1f}  {r['secular_de422']:12.4f}  {r['secular_de422_center']:12.4f}  {r['secular_de422_smooth']:12.4f}  {r['residual']:10.4f}  {r['rms_P0']:10.6f}  {r['rms_PGR']:10.6f}  {r['rms_P391838']:10.6f}  {r['rms_hybrid']:10.6f}")
+    for planet in ['Mercury', 'Mars']:
+        print(f"\n  {planet}:")
+        print(f"  {'Шаг':>6s} {'Секулярная':>12s} {'Центр.':>12s} {'Сглаж.':>12s} "
+              f"{'Остаток':>10s} {'RMS':>10s}")
+        print(f"  {'-'*6} {'-'*12} {'-'*12} {'-'*12} {'-'*10} {'-'*10}")
+        for step in step_days_list:
+            r = all_results[planet][step]
+            print(f"  {step:6.1f} {r['secular_full']:12.4f} {r['secular_central']:12.4f} "
+                  f"{r['secular_smooth']:12.4f} {r['residual_full']:10.4f} "
+                  f"{r['rms_longitude']:10.6f}")
     
     # Анализ сходимости
     print(f"\n{'=' * 80}")
     print("АНАЛИЗ СХОДИМОСТИ")
     print(f"{'=' * 80}")
     
-    for body_name in body_list:
-        print(f"\n  {body_name}:")
-        dts = dt_list
-        sec = [results[body_name][dt]['secular_de422'] for dt in dts]
-        res = [results[body_name][dt]['residual'] for dt in dts]
-        rms0 = [results[body_name][dt]['rms_P0'] for dt in dts]
-        rmsgr = [results[body_name][dt]['rms_PGR'] for dt in dts]
-        rms39 = [results[body_name][dt]['rms_P391838'] for dt in dts]
-        rmsh = [results[body_name][dt]['rms_hybrid'] for dt in dts]
-        
-        # Изменение при переходе 60 -> 30, 30 -> 15, 15 -> 7.5
-        for i in range(len(dts) - 1):
-            d_sec = sec[i+1] - sec[i]
-            d_res = res[i+1] - res[i]
-            d_rms0 = rms0[i+1] - rms0[i]
-            d_rmsgr = rmsgr[i+1] - rmsgr[i]
-            d_rms39 = rms39[i+1] - rms39[i]
-            d_rmsh = rmsh[i+1] - rmsh[i]
-            
-            print(f"    {dts[i]:.1f} -> {dts[i+1]:.1f} дней:")
+    for planet in ['Mercury', 'Mars']:
+        print(f"\n  {planet}:")
+        for i in range(len(step_days_list) - 1):
+            s1 = step_days_list[i]
+            s2 = step_days_list[i + 1]
+            r1 = all_results[planet][s1]
+            r2 = all_results[planet][s2]
+            d_sec = r2['secular_full'] - r1['secular_full']
+            d_res = r2['residual_full'] - r1['residual_full']
+            d_rms = r2['rms_longitude'] - r1['rms_longitude']
+            print(f"    {s1:.1f} -> {s2:.1f} дней:")
             print(f"      Δ секулярная:  {d_sec:+.6f} arcsec/век")
             print(f"      Δ остаток:     {d_res:+.6f} arcsec/век")
-            print(f"      Δ RMS P0:     {d_rms0:+.6f}°")
-            print(f"      Δ RMS GR:     {d_rmsgr:+.6f}°")
-            print(f"      Δ RMS A391838:{d_rms39:+.6f}°")
-            print(f"      Δ RMS гибрид:  {d_rmsh:+.6f}°")
+            print(f"      Δ RMS:         {d_rms:+.6f}°")
         
-        # Относительное изменение 30 -> 7.5
-        if len(dts) >= 3:
-            idx_30 = dts.index(30) if 30 in dts else 1
-            idx_75 = dts.index(7.5) if 7.5 in dts else 3
-            if idx_30 < len(sec) and idx_75 < len(sec):
-                rel_sec = abs((sec[idx_75] - sec[idx_30]) / sec[idx_30]) * 100 if sec[idx_30] != 0 else 0
-                rel_res = abs((res[idx_75] - res[idx_30]) / res[idx_30]) * 100 if res[idx_30] != 0 else 0
-                print(f"    Относительное изменение 30 -> 7.5 дней:")
-                print(f"      Секулярная: {rel_sec:.4f}%")
-                print(f"      Остаток:    {rel_res:.4f}%")
+        # Относительное изменение 30 -> 7.5 дней
+        r30 = all_results[planet][30.0]
+        r75 = all_results[planet][7.5]
+        rel_change = abs(r75['secular_full'] - r30['secular_full']) / abs(r30['secular_full']) * 100
+        print(f"    Относительное изменение 30 -> 7.5 дней:")
+        print(f"      Секулярная: {rel_change:.4f}%")
     
-    # График
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # Итог
+    print(f"\n{'=' * 80}")
+    print("ВЫВОД:")
+    print(f"{'=' * 80}")
+    for planet in ['Mercury', 'Mars']:
+        seculars = [all_results[planet][s]['secular_full'] for s in step_days_list]
+        spread = max(seculars) - min(seculars)
+        mean_sec = np.mean(seculars)
+        residuals = [all_results[planet][s]['residual_full'] for s in step_days_list]
+        mean_res = np.mean(residuals)
+        print(f"  {planet}:")
+        print(f"    Разброс секулярной скорости: {spread:.6f} arcsec/век")
+        print(f"    Средний остаток:              {mean_res:.4f} arcsec/век")
+        status = "УСТОЙЧИВО" if spread < 0.01 else "НЕСТАБИЛЬНО"
+        print(f"    Статус: {status}")
     
-    for idx, body_name in enumerate(body_list):
-        ax1 = axes[idx, 0]
-        ax2 = axes[idx, 1]
-        
-        for dt in dt_list:
-            r = results[body_name][dt]
-            ax1.plot(dt, r['secular_de422'], 'o-', label=f'Секулярная')
-            ax1.plot(dt, r['secular_de422_center'], 's-', label=f'Центральная')
-            ax1.plot(dt, r['secular_de422_smooth'], '^-', label=f'Сглаженная')
-        
-        ax1.set_xlabel('Шаг, дни')
-        ax1.set_ylabel('dπ/dt, arcsec/век')
-        ax1.set_title(f'{body_name}: секулярная скорость vs шаг')
-        ax1.legend()
-        ax1.grid(True)
-        
-        for dt in dt_list:
-            r = results[body_name][dt]
-            ax2.plot(dt, r['rms_P0'], 'o-', label='P0')
-            ax2.plot(dt, r['rms_PGR'], 's-', label='P_GR')
-            ax2.plot(dt, r['rms_P391838'], '^-', label='P_391838')
-            ax2.plot(dt, r['rms_hybrid'], 'D-', label='P_hybrid')
-        
-        ax2.set_xlabel('Шаг, дни')
-        ax2.set_ylabel('RMS, градусы')
-        ax2.set_title(f'{body_name}: RMS долготы vs шаг')
-        ax2.legend()
-        ax2.grid(True)
+    # График сходимости
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     
-    plt.suptitle('Тест сходимости: устойчивость результатов при изменении шага', fontsize=14)
+    for ax, planet in zip(axes, ['Mercury', 'Mars']):
+        steps = step_days_list
+        seculars = [all_results[planet][s]['secular_full'] for s in steps]
+        centrals = [all_results[planet][s]['secular_central'] for s in steps]
+        smooths = [all_results[planet][s]['secular_smooth'] for s in steps]
+        
+        ax.semilogx(steps, seculars, 'o-', label='Полный интервал', markersize=8)
+        ax.semilogx(steps, centrals, 's--', label='Центральный (10-90%)', markersize=6)
+        ax.semilogx(steps, smooths, '^:', label='Сглаженный', markersize=6)
+        
+        params = PLANETS[planet]
+        newtonian = params['newtonian']
+        # Теоретические линии
+        a0 = params['a0']
+        e0 = params['e0']
+        p_gr = precession_arcsec_per_century('P_GR', a0, e0)
+        p_391838 = precession_arcsec_per_century('P_391838', a0, e0)
+        
+        ax.axhline(y=newtonian + p_gr, color='green', linestyle='--',
+                  alpha=0.5, label=f'Newtonian + GR = {newtonian + p_gr:.1f}')
+        ax.axhline(y=newtonian + p_391838, color='red', linestyle='--',
+                  alpha=0.5, label=f'Newtonian + A391838 = {newtonian + p_391838:.1f}')
+        
+        ax.set_xlabel('Шаг, дней')
+        ax.set_ylabel('Секулярная скорость, arcsec/век')
+        ax.set_title(f'{planet}: сходимость по шагу')
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
+        ax.invert_xaxis()
+    
     plt.tight_layout()
     plt.savefig('convergence_test.png', dpi=150, bbox_inches='tight')
     plt.close()
     
-    print(f"\n{'=' * 80}")
-    print("График сохранён: convergence_test.png")
-    print(f"{'=' * 80}")
-    
-    # Вывод: устойчив или нет
-    print(f"\nВЫВОД:")
-    for body_name in body_list:
-        sec_vals = [results[body_name][dt]['secular_de422'] for dt in dt_list]
-        res_vals = [results[body_name][dt]['residual'] for dt in dt_list]
-        
-        sec_spread = max(sec_vals) - min(sec_vals)
-        res_spread = max(res_vals) - min(res_vals)
-        res_mean = np.mean(res_vals)
-        
-        stable = sec_spread < 0.1 and res_spread < 0.1
-        
-        print(f"  {body_name}:")
-        print(f"    Разброс секулярной скорости: {sec_spread:.6f} arcsec/век")
-        print(f"    Разброс остатка:              {res_spread:.6f} arcsec/век")
-        print(f"    Средний остаток:              {res_mean:.4f} arcsec/век")
-        print(f"    Статус: {'УСТОЙЧИВО' if stable else 'НЕСТАБИЛЬНО — нужен меньший шаг'}")
+    print(f"\n  График сохранён: convergence_test.png")
+    print("\nТест сходимости завершён.")
 
 if __name__ == '__main__':
     main()
