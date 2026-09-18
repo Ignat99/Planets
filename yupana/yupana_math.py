@@ -566,3 +566,42 @@ def a391838_generating_function_coeffs(n_terms=10):
     print("\nA391838 triangular representations:")
     for n, val, rep in a391838_triangular_indices(10):
         print(f"  n={n}, val={val}: {rep}")
+
+
+# ============================================================
+# Section 8b: Совместимость с yupana_emulator6
+# ============================================================
+
+def stirling_matrix_compat(nrows, ncols, max_n):
+    """
+    Версия stirling_matrix, совместимая с yupana_emulator6.
+    Эмулятор вызывает stirling_matrix(nrows, ncols, S_MAX).
+    Возвращает матрицу S(n, k) размером nrows x ncols,
+    где n = 0..nrows-1, k = 0..ncols-1.
+    """
+    matrix = []
+    for n in range(nrows):
+        row = []
+        for k in range(ncols):
+            if k > n:
+                row.append(0)
+            elif k == 0 and n == 0:
+                row.append(1)
+            elif k == 0:
+                row.append(0)
+            elif k == n:
+                row.append(1)
+            else:
+                row.append(stirling_second_kind(n, k))
+        matrix.append(row)
+    return matrix
+
+
+# Переопределить stirling_matrix для совместимости с эмулятором
+def stirling_matrix(nrows, ncols, max_n=None):
+    """
+    stirling_matrix(nrows, ncols) — старый вызов (2 аргумента)
+    stirling_matrix(nrows, ncols, max_n) — вызов из emulator6 (3 аргумента)
+    """
+    return stirling_matrix_compat(nrows, ncols, max_n)
+
