@@ -1,354 +1,233 @@
 """
-Yupana Oscillator — целочисленный генератор синуса на треугольной сетке.
+Yupana Oscillator — целочисленный NCO на разностных регистрах юпаны.
 
-Три регистра юпаны:
+Три регистра = три строки юпаны:
   Строка 1 (S) — значение синуса (аккумулятор)
-  Строка 2 (V) — первая разность / скорость
-  Строка 3 (T) — треугольные числа / сетка эклиптики
+  Строка 2 (V) — первая разность (скорость)
+  Строка 3 (T) — треугольные числа (сетка эклиптики)
 
-Арифметика: только сложение, вычитание, битовые сдвиги.
-Аналог: диодный формирователь синуса из треугольного сигнала.
-
-Двухконтурная версия:
-  Контур Луны — быстрое колебание (сдвиг 6, /64)
-  Контур Солнца — медленная аномалия M (сдвиг 9, /512)
+Два контура:
+  Луна  — быстрый, сдвиг 6 (период 4 шага)
+  Солнце — медленный, сдвиг 9 (период 16 шагов, аномалия M)
 """
 
 import math
+import csv
+from fractions import Fraction
 from typing import List, Tuple
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 1: Базовый генератор синуса на треугольной сетке
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 1: Базовый NCO ─────────────────────────────────────────────────
 
-def generate_sine_on_triangular_grid(
-    steps: int,
-    amplitude: int = 100000,
-    shift_bit: int = 6
-) -> List[Tuple[int, int, int]]:
+def generate_sine_on_triangular_grid(steps: int, amplitude: int = 100000, shift_bit: int = 6):
     """
-    Вычисление дискретного синуса в точках треугольного ряда (3-я строка Юпаны).
-    Расчёт идёт через суммы и разности разностных регистров.
-
-    Параметры:
-      steps     — количество шагов
-      amplitude — начальная амплитуда (значение V при n=0)
-      shift_bit — битовый сдвиг масштабирования (6 = деление на 64)
-
-    Возвращает: список кортежей (n, T, S)
-      n — номер шага
-      T — треугольное число (сетка эклиптики)
-      S — значение синуса
+    Вычисление дискретного синуса в точках треугольного ряда.
+    Расчёт через суммы и разности разностных регистров.
+    shift_bit: битовый сдвиг для масштабирования (деление на 2^shift_bit).
+               6 = деление на 64 (исходный алгоритм, слабая обратная связь).
+               4 = деление на 16 (более сильная, период ~71 шага).
     """
-    S = 0            # Регистр синуса (Строка 1)
-    V = amplitude    # Регистр скорости (Строка 2)
-    T = 0            # Регистр треугольных чисел (Строка 3)
-
+    S = 0
+    V = amplitude
+    T = 0
     results = []
-
     for n in range(1, steps + 1):
-        # 1. Шаг по сетке эклиптики: T_n = n(n+1)/2
         T = T + n
-
-        # 2. Знаковый флаг: попарное переключение ++, --, ++, -- ...
         is_positive = ((n >> 1) & 1) == 0
-
-        # 3. Перенос разностей между регистрами
         delta = S >> shift_bit
-
         if is_positive:
             V = V - delta
         else:
             V = V + delta
-
         S = S + V
-
         results.append((n, T, S))
-
     return results
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 2: Подсчёт операций
-# ──────────────────────────────────────────────────────────────────────────────
+def generate_sine_fraction(steps: int, amplitude: Fraction = Fraction(100000), shift_bit: int = 6):
+    """Та же генерация, но через Fraction для точной арифметики."""
+    S = Fraction(0)
+    V = amplitude
+    T = Fraction(0)
+    divisor = Fraction(1 << shift_bit)
+    results = []
+    for n in range(1, steps + 1):
+        T = T + n
+        is_positive = ((n >> 1) & 1) == 0
+        delta = S / divisor
+        if is_positive:
+            V = V - delta
+        else:
+            V = V + delta
+        S = S + V
+        results.append((n, int(T), S))
+    return results
 
-def count_operations_per_step() -> dict:
-    """
-    Подсчёт арифметических и логических операций на один шаг.
 
-    На каждый шаг:
-      - T = T + n                           → 1 сложение
-      - (n >> 1) & 1                        → 1 сдвиг, 1 И, 1 сравнение
-      - delta = S >> shift_bit              → 1 сдвиг
-      - V = V ± delta                       → 1 сложение/вычитание
-      - S = S + V                           → 1 сложение
+# ── Section 2: Подсчёт операций ─────────────────────────────────────────────
 
-    Итого: 3 сложения/вычитания, 2 сдвига, 1 И, 1 сравнение.
-    """
+def count_operations_per_step():
+    """Количество арифметических операций на один шаг."""
     return {
         "additions_subtractions": 3,
         "bitwise_shifts": 2,
         "bitwise_and": 1,
-        "comparisons": 1,
-        "total_ops": 7,
         "multiplications": 0,
         "divisions": 0,
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 3: Двухконтурный генератор (Луна + Солнце)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 3: Двухконтурный NCO ────────────────────────────────────────────
 
-def generate_two_loop_sine_yupana(
-    steps: int,
-    amplitude: int = 100000,
-    shift_moon: int = 6,
-    shift_sun: int = 9,
-    sun_amplitude_div: int = 2
-) -> List[Tuple[int, int, int, int, int]]:
+def generate_two_loop_sine_yupana(steps: int, amplitude: int = 100000,
+                                  shift_moon: int = 6, shift_sun: int = 9):
     """
-    Разностный алгоритм в стиле Юпаны с двумя независимыми контурами.
-
-    1-й контур (Луна): быстрое колебание, сдвиг shift_moon (по умолчанию /64)
-    2-й контур (Солнце): медленная аномалия M, сдвиг shift_sun (по умолчанию /512)
-      Знак Солнца переключается каждые 8 шагов (сдвиг индекса на 3 бита).
-
-    Параметры:
-      steps           — количество шагов
-      amplitude       — начальная амплитуда лунного контура
-      shift_moon      — битовый сдвиг для лунной волны (6 = /64)
-      shift_sun       — битовый сдвиг для солнечной волны (9 = /512)
-      sun_amplitude_div — делитель начальной амплитуды солнца (2 = amplitude/4)
-
-    Возвращает: список кортежей (n, T, S_moon, S_sun, S_total)
+    Двухконтурный разностный алгоритм.
+    1-й контур: Луна (быстрый, сдвиг shift_moon, период 4)
+    2-й контур: Солнце (медленный, сдвиг shift_sun, период 16)
     """
-    # === КОНТУР ЛУНЫ (Быстрый регистр) ===
     S_moon = 0
     V_moon = amplitude
     T = 0
-
-    # === КОНТУР СОЛНЦА (Медленный регистр для аномалии M) ===
+    
     S_sun = 0
-    V_sun = amplitude >> sun_amplitude_div
-
+    V_sun = amplitude >> 2
+    
     results = []
-
     for n in range(1, steps + 1):
-        # --- Шаг 1: Сетка эклиптики ---
         T = T + n
-
-        # --- Шаг 2: Контур Луны (быстрое переключение: каждые 2 шага) ---
+        
+        # Контур Луны
         moon_positive = ((n >> 1) & 1) == 0
         delta_moon = S_moon >> shift_moon
-
         if moon_positive:
             V_moon = V_moon - delta_moon
         else:
             V_moon = V_moon + delta_moon
-
         S_moon = S_moon + V_moon
-
-        # --- Шаг 3: Контур Солнца (медленное переключение: каждые 8 шагов) ---
+        
+        # Контур Солнца
         sun_positive = ((n >> 3) & 1) == 0
         delta_sun = S_sun >> shift_sun
-
         if sun_positive:
             V_sun = V_sun - delta_sun
         else:
             V_sun = V_sun + delta_sun
-
         S_sun = S_sun + V_sun
-
-        # --- Шаг 4: Слияние двух контуров ---
+        
         S_total = S_moon + S_sun
-
         results.append((n, T, S_moon, S_sun, S_total))
-
+    
     return results
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 4: Сравнение с математическим синусом
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 4: Сравнение с math.sin ─────────────────────────────────────────
 
-def compare_with_math_sine(
-    steps: int,
-    amplitude: int = 100000,
-    shift_bit: int = 6
-) -> List[Tuple[int, int, float, int, float]]:
-    """
-    Сравнение целочисленного синуса юпаны с math.sin.
-
-    Возвращает: (n, T, sin_math, S_yupana, error_pct)
-    """
+def compare_with_math_sine(steps: int, amplitude: int = 100000, shift_bit: int = 6):
+    """Сравнение целочисленного NCO с math.sin."""
     results = generate_sine_on_triangular_grid(steps, amplitude, shift_bit)
-
-    comparison = []
+    comparisons = []
     for n, T, S in results:
-        # Нормализация: период синуса юпаны ~ 8 шагов (4 положительных + 4 отрицательных)
-        sin_math = amplitude * math.sin(2 * math.pi * n / 8)
-        if sin_math != 0:
-            error_pct = abs((S - sin_math) / sin_math) * 100
-        else:
-            error_pct = 0.0 if S == 0 else float('inf')
-        comparison.append((n, T, sin_math, S, error_pct))
-
-    return comparison
+        normalized = S / amplitude
+        math_val = math.sin(n * math.pi / 2)
+        error = abs(normalized - math_val)
+        comparisons.append((n, T, S, normalized, math_val, error))
+    return comparisons
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 5: Экспорт в CSV
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 5: Экспорт CSV ──────────────────────────────────────────────────
 
-def export_oscillator_csv(
-    steps: int,
-    amplitude: int = 100000,
-    shift_bit: int = 6,
-    filepath: str = None
-) -> str:
-    """
-    Экспорт таблицы синуса в CSV.
-    Если filepath задан — сохраняет в файл, иначе возвращает строку.
-    """
-    results = generate_sine_on_triangular_grid(steps, amplitude, shift_bit)
-
-    lines = ["n,T,S"]
-    for n, T, S in results:
-        lines.append(f"{n},{T},{S}")
-
-    csv = "\n".join(lines)
-
-    if filepath:
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(csv)
-
-    return csv
+def export_oscillator_csv(results, filename):
+    """Экспорт одноконтурного осциллятора в CSV."""
+    with open(filename, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['step_n', 'triangular_T', 'sine_S'])
+        for n, T, S in results:
+            writer.writerow([n, T, S])
 
 
-def export_two_loop_csv(
-    steps: int,
-    amplitude: int = 100000,
-    shift_moon: int = 6,
-    shift_sun: int = 9,
-    filepath: str = None
-) -> str:
-    """
-    Экспорт двухконтурной таблицы в CSV.
-    """
-    results = generate_two_loop_sine_yupana(steps, amplitude, shift_moon, shift_sun)
-
-    lines = ["n,T,S_moon,S_sun,S_total"]
-    for n, T, S_m, S_s, S_tot in results:
-        lines.append(f"{n},{T},{S_m},{S_s},{S_tot}")
-
-    csv = "\n".join(lines)
-
-    if filepath:
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(csv)
-
-    return csv
+def export_two_loop_csv(results, filename):
+    """Экспорт двухконтурного осциллятора в CSV."""
+    with open(filename, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['step_n', 'grid_T', 'moon_S', 'sun_S', 'total_S'])
+        for n, T, S_m, S_s, S_tot in results:
+            writer.writerow([n, T, S_m, S_s, S_tot])
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 6: SPICE-экспорт (NCO как поведенческая модель)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 6: Экспорт SPICE ─────────────────────────────────────────────────
 
-def export_oscillator_spice(
-    steps: int = 32,
-    amplitude: int = 100000,
-    shift_bit: int = 6,
-    filepath: str = None
-) -> str:
-    """
-    Экспорт осциллятора как SPICE поведенческой модели (B-источники).
-
-    Модель: 3 регистра (S, V, T) с дискретным шагом.
-    Аналог: цифровой NCO с треугольной сеткой.
-    """
-    lines = [
-        "* Yupana Oscillator — NCO on triangular grid",
-        f"* Amplitude={amplitude}, Shift={shift_bit} (/{1 << shift_bit})",
-        "* Registers: S (sine), V (velocity), T (triangular grid)",
-        ".subckt yupana_osc n_S n_V n_T n_clk",
-        "",
-        "* Discrete-time registers (clocked)",
-        f"B_S n_S 0 V=V(n_S) + V(n_V)",
-        f"B_V n_V 0 V={amplitude} - (V(n_S) >> {shift_bit}) * sign(n)",
-        f"B_T n_T 0 V=V(n_T) + n",
-        "",
-        ".ends yupana_osc",
-        "",
-        "* Testbench",
-        "X1 n_S n_V n_T n_clk yupana_osc",
-        "Vclk n_clk 0 PULSE(0 1 0 1n 1n 1n 2n)",
-        ".tran 2n 64n",
-        ".end",
-    ]
-
-    spice = "\n".join(lines)
-
-    if filepath:
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(spice)
-
-    return spice
+def export_oscillator_spice(filename, amplitude=100000, shift_bit=6):
+    """Экспорт NCO как SPICE .subckt с поведенческими B-источниками."""
+    divisor = 1 << shift_bit
+    code = f"""* Yupana Oscillator NCO
+* Amplitude: {amplitude}, Shift: {shift_bit} (divisor: {divisor})
+.subckt yupana_osc n_clk n_sine n_grid 0
+.param AMP={amplitude}
+.param DIV={divisor}
+BSINE n_sine 0 V=V(n_sine_int)
+BGRID n_grid 0 V=V(n_grid_int)
+BVEL n_vel 0 V=V(n_vel_int)
+BSINT n_sine_int 0 I=V(n_sine)
+BVELINT n_vel_int 0 I=V(n_vel) - V(n_sine)/{divisor}
+BGRIDINT n_grid_int 0 I=V(n_grid) + 1
+.ends
+"""
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(code)
+    return filename
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 7: Интеграция с yupana_math
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Section 7: Интеграция с эмулятором юпаны ─────────────────────────────────
 
-def triangular_grid_sequence(length: int) -> List[int]:
-    """
-    Возвращает последовательность треугольных чисел T_1, T_2, ..., T_length.
-    Это сетка эклиптики — третья строка юпаны.
-    """
-    return [n * (n + 1) // 2 for n in range(1, length + 1)]
+def triangular_grid_sequence(n):
+    """Возвращает треугольные числа T_1 .. T_n."""
+    return [(k * (k + 1)) // 2 for k in range(1, n + 1)]
 
 
-def oscillator_to_yupana_bottom_row(
-    steps: int,
-    amplitude: int = 100000,
-    shift_bit: int = 6
-) -> List[int]:
-    """
-    Возвращает значения синуса (регистр S) — для отображения в нижней строке юпаны.
-    """
+def oscillator_to_yupana_bottom_row(steps=9, amplitude=100000, shift_bit=6):
+    """Возвращает значения синуса для нижней строки юпаны."""
     results = generate_sine_on_triangular_grid(steps, amplitude, shift_bit)
     return [S for _, _, S in results]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Самопроверка
-# ──────────────────────────────────────────────────────────────────────────────
+def two_loop_to_yupana_bottom_row(steps=9, amplitude=100000, shift_bit_moon=6, shift_bit_sun=9):
+    """Возвращает итоговые значения двухконтурного осциллятора для нижней строки."""
+    results = generate_two_loop_sine_yupana(steps, amplitude, shift_bit_moon, shift_bit_sun)
+    return [S_tot for _, _, _, _, S_tot in results]
 
-if __name__ == "__main__":
-    print("=== Базовый осциллятор (12 шагов) ===")
+
+# ── Section 8: Знаковые паттерны ─────────────────────────────────────────────
+
+def moon_sign_pattern(steps):
+    """Знаковый паттерн Луны: период 4 (+, --, ++, --)."""
+    return ['+' if ((n >> 1) & 1) == 0 else '-' for n in range(1, steps + 1)]
+
+
+def sun_sign_pattern(steps):
+    """Знаковый паттерн Солнца: период 16."""
+    return ['+' if ((n >> 3) & 1) == 0 else '-' for n in range(1, steps + 1)]
+
+
+# ── Section 9: Самопроверка ──────────────────────────────────────────────────
+
+if __name__ == '__main__':
+    print("=== Одноконтурный NCO (12 шагов, shift=6) ===")
     table = generate_sine_on_triangular_grid(12)
-    print(f"{'n':>4} | {'T':>6} | {'S':>8}")
-    print("-" * 25)
+    print(f"{'n':>4} {'T':>6} {'S':>10}")
     for n, T, S in table:
-        print(f"{n:>4} | {T:>6} | {S:>8}")
-
+        print(f"{n:>4} {T:>6} {S:>10}")
+    
+    print("\n=== Двухконтурный NCO (24 шага) ===")
+    table2 = generate_two_loop_sine_yupana(24)
+    print(f"{'n':>4} {'T':>6} {'Moon':>10} {'Sun':>10} {'Total':>10}")
+    for n, T, Sm, Ss, St in table2:
+        print(f"{n:>4} {T:>6} {Sm:>10} {Ss:>10} {St:>10}")
+    
     print("\n=== Операций на шаг ===")
     print(count_operations_per_step())
-
-    print("\n=== Двухконтурный (24 шага) ===")
-    table2 = generate_two_loop_sine_yupana(24)
-    print(f"{'n':>4} | {'T':>6} | {'Moon':>8} | {'Sun':>8} | {'Total':>8}")
-    print("-" * 45)
-    for n, T, S_m, S_s, S_tot in table2:
-        print(f"{n:>4} | {T:>6} | {S_m:>8} | {S_s:>8} | {S_tot:>8}")
-
-    print("\n=== Сравнение с math.sin ===")
-    comp = compare_with_math_sine(16)
-    print(f"{'n':>4} | {'sin_math':>10} | {'S_yupana':>10} | {'err%':>8}")
-    print("-" * 40)
-    for n, T, sm, sy, ep in comp:
-        print(f"{n:>4} | {sm:>10.1f} | {sy:>10} | {ep:>8.2f}")
-
-    print("\n=== SPICE ===")
-    print(export_oscillator_spice()[:200])
+    
+    print("\n=== Знаковый паттерн Луны (16) ===")
+    print(' '.join(moon_sign_pattern(16)))
+    print("\n=== Знаковый паттерн Солнца (32) ===")
+    print(' '.join(sun_sign_pattern(32)))
