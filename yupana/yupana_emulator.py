@@ -26,10 +26,15 @@ import sys
 # Добавляем каталог, где лежит yupana_emulator6.py, в путь поиска
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from yupana_oscillator import oscillator_to_yupana_bottom_row
 
-# В эмуляторе:
-# bottom_row = oscillator_to_yupana_bottom_row(steps=9, amplitude=100000, shift_bit=6)
+# Для осциллятора:
+from yupana_oscillator import oscillator_to_yupana_bottom_row
+bottom_row = oscillator_to_yupana_bottom_row(steps=9, amplitude=100000, shift_bit=6)
+
+# Для решётки:
+from yupana_lattice_hook import lattice_to_yupana, lattice_to_bottom_row
+left_row, right_row, result, info = lattice_to_yupana(23, 41)
+bottom = lattice_to_bottom_row(23, 41)
 
 
 from yupana_math import (
