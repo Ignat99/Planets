@@ -1,0 +1,7 @@
+"law_16": {
+    "ru": "Закон Ампера",
+    "en": "Ampere's law",
+    "formula": "F = B * l1 * Eps_0*c^3",
+    "part_order": ["B", "I", "l1"],
+    "comments": {"ru": "...", "en": "..."}
+}
