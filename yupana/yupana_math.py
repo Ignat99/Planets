@@ -605,3 +605,28 @@ def stirling_matrix(nrows, ncols, max_n=None):
     """
     return stirling_matrix_compat(nrows, ncols, max_n)
 
+# ============================================================
+# Section 8c: Числа Стирлинга 2-го рода
+# ============================================================
+
+def stirling_second_kind(n, k):
+    """
+    Число Стирлинга 2-го рода S(n,k) —
+    количество способов разбить n элементов на k непустых подмножеств.
+    """
+    if k > n:
+        return 0
+    if k == 0:
+        return 1 if n == 0 else 0
+    if k == 1 or k == n:
+        return 1
+    # Рекуррентная формула: S(n,k) = k*S(n-1,k) + S(n-1,k-1)
+    # Через итеративное вычисление (без глубокой рекурсии)
+    prev = [0] * (k + 1)
+    prev[0] = 1
+    for i in range(1, n + 1):
+        curr = [0] * (k + 1)
+        for j in range(1, min(i, k) + 1):
+            curr[j] = j * prev[j] + prev[j - 1]
+        prev = curr
+    return prev[k]
