@@ -1,0 +1,323 @@
+* ==========================================================
+* SFV Plotnikov — full SPICE netlist
+* Source: https://plotnikovna.narod.ru/
+* ==========================================================
+
+* --- COCYCLES ---
+* --- Cocycle: Инфостатика (scale=Eps_0*c^6) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] R            l ^ nabla
+
+.subckt cocycle_0_4
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Люминесцентатика (светостática) (scale=Eps_0*c^6) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^6    
+*   [     9] v_ee         
+*   [   911] v_e          
+*   [   913] T            
+*   [   915] T_l          
+*   [   917] N_l          
+*   [   919] l_1          
+*   [   925] S_l          
+*   [   927] l_2          
+
+.subckt cocycle_2_Lightostatics
+R_0 n_0 0 1
+R_9 n_9 0 1
+R_911 n_911 0 1
+R_913 n_913 0 1
+R_915 n_915 0 1
+R_917 n_917 0 1
+R_919 n_919 0 1
+R_925 n_925 0 1
+R_927 n_927 0 1
+.ends
+
+* --- Cocycle: Ньютоника (промежуточный) (scale=Eps_0*c^5) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^5    
+
+.subckt cocycle_30_N
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Упругостатика (scale=Eps_0*c^4) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^4    
+*   [     3] V3           
+*   [     5] S_aa         
+*   [     7] S_a          
+*   [     9] S            
+*   [   911] l1           
+*   [   913] Q            
+*   [   915] F            
+*   [   917] alpha        
+*   [   919] R            
+*   [   921] k            
+*   [   923] P            
+*   [   925] R2           
+*   [   927] n            
+*   [   929] gamma        
+
+.subckt cocycle_3_Elasticostatics
+R_0 n_0 0 1
+R_3 n_3 0 1
+R_5 n_5 0 1
+R_7 n_7 0 1
+R_9 n_9 0 1
+R_911 n_911 0 1
+R_913 n_913 0 1
+R_915 n_915 0 1
+R_917 n_917 0 1
+R_919 n_919 0 1
+R_921 n_921 0 1
+R_923 n_923 0 1
+R_925 n_925 0 1
+R_927 n_927 0 1
+R_929 n_929 0 1
+.ends
+
+* --- Cocycle: Импульсатика (промежуточный) (scale=Eps_0*c^3) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^3    
+
+.subckt cocycle_40_I
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Магнитостатика (scale=Eps_0*c^2) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^2    
+*   [     5] p_mm         
+*   [     7] p_m          
+*   [     9] L            
+*   [   911] P_m          
+*   [   913] Phi_m        
+*   [   915] v_s          
+*   [   917] I            
+*   [   919] H            
+*   [   921] B            
+*   [   923] M_0          
+*   [   925] j            
+*   [   927] divj         
+*   [   929] J            
+*   [   931] v_m          
+*   [   933] Z_a          
+
+.subckt cocycle_4_Magnetostatics
+R_0 n_0 0 1
+R_5 n_5 0 1
+R_7 n_7 0 1
+R_9 n_9 0 1
+R_911 n_911 0 1
+R_913 n_913 0 1
+R_915 n_915 0 1
+R_917 n_917 0 1
+R_919 n_919 0 1
+R_921 n_921 0 1
+R_923 n_923 0 1
+R_925 n_925 0 1
+R_927 n_927 0 1
+R_929 n_929 0 1
+R_931 n_931 0 1
+R_933 n_933 0 1
+.ends
+
+* --- Cocycle: Релятивистика (промежуточный) (scale=Eps_0*c^1) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^1    
+
+.subckt cocycle_50_1r
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Электростатика (scale=Eps_0*c^0) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^0    
+*   [     5] j_e          
+*   [     7] P_e          
+*   [     9] S_m          
+*   [   911] N            
+*   [   913] m            
+*   [   915] tau          
+*   [   917] phi          
+*   [   919] E            
+*   [   921] D            
+*   [   923] rho_e        
+*   [   925] 1_eps        
+*   [   929] n_rho        
+
+.subckt cocycle_5_Electrostatics
+R_0 n_0 0 1
+R_5 n_5 0 1
+R_7 n_7 0 1
+R_9 n_9 0 1
+R_911 n_911 0 1
+R_913 n_913 0 1
+R_915 n_915 0 1
+R_917 n_917 0 1
+R_919 n_919 0 1
+R_921 n_921 0 1
+R_923 n_923 0 1
+R_925 n_925 0 1
+R_929 n_929 0 1
+.ends
+
+* --- Cocycle: Волновика (промежуточный) (scale=Eps_0*c^-1) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^-1   
+
+.subckt cocycle_60_
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Радиатостатика (scale=Eps_0*c^-2) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^-2   
+*   [   911] K_ee         
+*   [   913] K_e          
+*   [   915] v3           
+*   [   917] 1/r          
+*   [   919] sig          
+*   [   921] D_r          
+
+.subckt cocycle_6_Radiatostatics
+R_0 n_0 0 1
+R_911 n_911 0 1
+R_913 n_913 0 1
+R_915 n_915 0 1
+R_917 n_917 0 1
+R_919 n_919 0 1
+R_921 n_921 0 1
+.ends
+
+* --- Cocycle: Квантовая (промежуточный) (scale=Eps_0*c^-3) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^-3   
+
+.subckt cocycle_70_
+R_0 n_0 0 1
+.ends
+
+* --- Cocycle: Атомостатика (scale=Eps_0*c^-4) ---
+* Cells: 34
+
+* Filled cells:
+*   [     0] Eps_0*c^-4   
+*   [   913] 1/C          
+*   [   915] Eps_0        
+
+.subckt cocycle_7_Atomostatics
+R_0 n_0 0 1
+R_913 n_913 0 1
+.ends
+
+* --- LAWS WITH FORMULAS ---
+* law_1: Закон Ома
+* Formula: gamma*T = j = (sig*E/T)*T
+.subckt law1  n_out
+B1 n_out 0 V=1
+.ends
+
+* law_2: Закон Джоуля — Ленца
+* Formula: Q = ((I / Eps_0*c^2) * dl1) * Eps_0*c^3
+.subckt law2  n_out
+B1 n_out 0 V=1
+.ends
+
+* law_6: Закон Био — Савара — Лапласа
+* Formula: B = I / l1 / Eps_0*c^2
+.subckt law6  n_out
+B1 n_out 0 V=1
+.ends
+
+* law_11: Второй закон Ньютона
+* Formula: E = F / m
+.subckt law11  n_out
+B1 n_out 0 V=1
+.ends
+
+* law_16: Закон Ампера
+* Formula: F = B * l1 * Eps_0*c^3
+.subckt law16 n_B n_I n_l1 n_out
+B1 n_out 0 V=V(n_B) * V(n_I) * V(n_l1)
+.ends
+
+* law_30: Закон всемирного тяготения
+* Formula: F = ((m / Eps_0*c^1) * Eps_0*c^3) / dl1
+.subckt law30 n_m n_l1 n_out
+B1 n_out 0 V=V(n_m) * V(n_l1)
+.ends
+
+* law_34: Закон Кулона
+* Formula: F = ((m / Eps_0*c^1) * Eps_0*c^3) / dl1
+.subckt law34 n_m n_l1 n_out
+B1 n_out 0 V=V(n_m) * V(n_l1)
+.ends
+
+* law_35: Сила Лоренца
+* Formula: F = m * E = (B * ((m / Eps_0*c^1) / v_s) * Eps_0*c^3)
+.subckt law35 n_B n_m n_v_s n_out
+B1 n_out 0 V=V(n_B) * V(n_m) * V(n_v_s)
+.ends
+
+* law_36: Электромагнитная индукция
+* Formula: phi = Phi_m / T
+.subckt law36 n_Phi_m n_T n_out
+B1 n_out 0 V=V(n_Phi_m) * V(n_T)
+.ends
+
+* law_38: Самоиндукция
+* Formula: D = tau / l1
+.subckt law38 n_tau n_l1 n_out
+B1 n_out 0 V=V(n_tau) * V(n_l1)
+.ends
+
+* law_43: Вихревые токи (токи Фуко)
+* Formula: I = Phi_m / l1 * Eps_0*c^2
+.subckt law43 n_Phi_m n_l1 n_out
+B1 n_out 0 V=V(n_Phi_m) * V(n_l1)
+.ends
+
+* law_49: Действие магнитного поля на контур с током
+* Formula: Q = B * S * Eps_0*c^3
+.subckt law49 n_B n_S n_alpha n_out
+B1 n_out 0 V=V(n_B) * V(n_S) * V(n_alpha)
+.ends
+
+* law_71: Теплопроводность изотропных тел
+* Formula: S_l = alpha / l1 * Eps_0*c^5
+.subckt law71 n_l_1 n_out
+B1 n_out 0 V=V(n_l_1)
+.ends
+
+* law_73: Основные уравнения динамики вращательного движения твёрдого тела
+* Formula: L = Q * T
+.subckt law73 n_Q n_T n_out
+B1 n_out 0 V=V(n_Q) * V(n_T)
+.ends

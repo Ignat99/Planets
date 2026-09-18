@@ -1,0 +1,400 @@
+{
+  "description": "Физические процессы СФВ Плотникова — операции между коциклами",
+  "source": "https://plotnikovna.narod.ru/",
+  "processes": {
+    "process_1": {
+      "name": {
+        "ru": "излучение",
+        "en": "radiation"
+      },
+      "operation": {
+        "direct": "GA +",
+        "backing": "GA *"
+      },
+      "notes": {
+        "ru": "создание и ликвидация потока",
+        "en": "establishment and liquidation of flow"
+      },
+      "tech_analog": {
+        "ru": "электролит",
+        "en": "electrolyte"
+      },
+      "comments": {
+        "ru": "скалярный потенциал, формула генерации пространства, телесный угол",
+        "en": "scalar potential, formula generation space, solid angle"
+      },
+      "options": {
+        "heat_flow": 3,
+        "solid_angle": 1,
+        "magnetic_driving_force": 1000,
+        "electro_motive_force": 1
+      },
+      "physical_laws": [
+        "law_71"
+      ]
+    },
+    "process_2": {
+      "name": {
+        "ru": "проводимость",
+        "en": "conductivity"
+      },
+      "operation": {
+        "direct": "GA -> GA",
+        "backing": "GA -> |"
+      },
+      "notes": {
+        "ru": "Проводящее пространство",
+        "en": "conducting space"
+      },
+      "tech_analog": {
+        "ru": "электролит",
+        "en": "electrolyte"
+      },
+      "comments": {
+        "ru": "Соединение массы и заряда через электрохимический эквивалент вещества",
+        "en": "Compound mass and charge through the electrochemical equivalent of the substance"
+      },
+      "options": {
+        "current": 3,
+        "time": 1,
+        "charge": 1000,
+        "mass": 1
+      }
+    },
+    "process_3": {
+      "name": {
+        "ru": "сбор",
+        "en": "collecting"
+      },
+      "operation": {
+        "direct": "G*A -> G'A",
+        "backing": "G'A -> G*A"
+      },
+      "notes": {
+        "ru": "Заставляет протекать в одном направлении. Пространство -> путь",
+        "en": "Causes flow in the same direction. Space -> way"
+      },
+      "tech_analog": {
+        "ru": "Рефлектор (собирает луч света и рассеивает его)",
+        "en": "Reflector"
+      },
+      "comments": {
+        "ru": "Оптическая напряжённость",
+        "en": "optical intensity"
+      },
+      "options": {
+        "spatial_curvature": 3,
+        "strength": 1,
+        "acceleration": 10
+      }
+    },
+    "process_4": {
+      "name": {
+        "ru": "проведение",
+        "en": "carriage"
+      },
+      "operation": {
+        "direct": "GA -> GA",
+        "backing": "GA -- GA"
+      },
+      "notes": {
+        "ru": "имеется ограничение связи",
+        "en": "there is a limitation due"
+      },
+      "tech_analog": {
+        "ru": "Провода, нефтепроводы, русло реки",
+        "en": "Wires, pipelines, river bed"
+      },
+      "comments": {
+        "ru": "Процесс передачи импульса до стабилизации поля скоростей в третьей форме — плотность кванта. Надо преодолеть энергетический барьер.",
+        "en": "The process of transferring momentum to stabilize the velocity field in the third form — the density of quantum."
+      },
+      "options": {
+        "barrier": 3,
+        "spring": 1,
+        "angular_velocity": 1,
+        "magnetic_induction": 1,
+        "electric_displacement": 1
+      }
+    },
+    "process_5": {
+      "name": {
+        "ru": "преобразование",
+        "en": "conversion"
+      },
+      "operation": {
+        "direct": "GA -> GB",
+        "backing": "GB -> GA"
+      },
+      "notes": {
+        "ru": "изменение свойства потока",
+        "en": "Change the flow properties"
+      },
+      "tech_analog": {
+        "ru": "Двигатель внутреннего сгорания",
+        "en": "Internal combustion engine"
+      },
+      "comments": {
+        "ru": "передача между таблицами с физическими процессами различной природы",
+        "en": "transfer between tables with physical processes of different nature"
+      },
+      "options": {
+        "mass": 3,
+        "energy": 1,
+        "charge": 10
+      },
+      "physical_laws": [
+        "law_1",
+        "law_2"
+      ]
+    },
+    "process_6": {
+      "name": {
+        "ru": "увеличение",
+        "en": "increase"
+      },
+      "operation": {
+        "direct": "GA1 < GA2",
+        "backing": "GA1 > GA2"
+      },
+      "notes": {
+        "ru": "изменение количества",
+        "en": "Changing the amount"
+      },
+      "tech_analog": {
+        "ru": "Усилители, трансформаторы, вентили, шестерни",
+        "en": "Amplifiers, transformers, valves, gears"
+      },
+      "comments": {
+        "ru": "коэффициенты потенциала",
+        "en": "odds on potential"
+      },
+      "options": {
+        "force": 1,
+        "velocity": 1,
+        "charge_density": 1
+      }
+    },
+    "process_7": {
+      "name": {
+        "ru": "изменение направления",
+        "en": "baffling"
+      },
+      "operation": {
+        "direct": "GA -^ GA",
+        "backing": "GA -. GA"
+      },
+      "notes": {
+        "ru": "изменение направления",
+        "en": "baffling"
+      },
+      "tech_analog": {
+        "ru": "Зеркала, шестерни, световоды",
+        "en": "Mirrors, gears, optical fibers"
+      },
+      "comments": {
+        "ru": "Коэффициенты передачи между индукцией и напряжённостью (для электричества), между векторным и скалярным квантом (для механики)",
+        "en": "Transfer coefficient between induction and strength (for electricity), between vector and scalar quantum (for mechanics)"
+      },
+      "options": {
+        "magnetic_induction": 1,
+        "spinor": 1,
+        "electric_displacement_field": 1
+      }
+    },
+    "process_8": {
+      "name": {
+        "ru": "выравнивание",
+        "en": "alignment"
+      },
+      "operation": {
+        "direct": "GA'' -> GA'",
+        "backing": "GA' -> GA''"
+      },
+      "notes": {
+        "ru": "колебания",
+        "en": "vibration"
+      },
+      "tech_analog": {
+        "ru": "выпрямители, диоды, колебательные контуры",
+        "en": "rectifiers, diodes, resonant circuits"
+      },
+      "comments": {
+        "ru": "увеличение потенциального барьера",
+        "en": "increase the potential barrier"
+      },
+      "options": {
+        "length": 1,
+        "curvature": 1,
+        "electric_field": 1
+      }
+    },
+    "process_9": {
+      "name": {
+        "ru": "связь",
+        "en": "link"
+      },
+      "operation": {
+        "direct": "GA o-o GA",
+        "backing": "GA o/o GA"
+      },
+      "notes": {
+        "ru": "физическая связь",
+        "en": "physical link"
+      },
+      "tech_analog": {
+        "ru": "выключатели",
+        "en": "switches"
+      },
+      "comments": {
+        "ru": "увеличение потенциального барьера",
+        "en": "increase the potential barrier"
+      },
+      "options": {
+        "energy": 1
+      }
+    },
+    "process_10": {
+      "name": {
+        "ru": "соединение",
+        "en": "connection"
+      },
+      "operation": {
+        "direct": "GA + GB -> GAB",
+        "backing": "GAB -< GA + GB"
+      },
+      "notes": {
+        "ru": "химическое соединение",
+        "en": "chemical connection"
+      },
+      "tech_analog": {
+        "ru": "химические процессы, карбюратор, смеситель, сепаратор, центрифуга",
+        "en": "chemical processes, carburetor, mixer, separator, centrifuge"
+      },
+      "comments": {
+        "ru": "алфавитные подстановки, генетические изменения, биоинформатика",
+        "en": "alphabetic substitution, genetic change, bioinformatics"
+      },
+      "options": {
+        "charge_density": 1,
+        "magnetic_field": 1,
+        "length": 1,
+        "magnetic_flux": 1
+      }
+    },
+    "process_11": {
+      "name": {
+        "ru": "объединение",
+        "en": "union"
+      },
+      "operation": {
+        "direct": "GA1 + GA2 -> GA1+A2",
+        "backing": "GA1+A2 -< GA1 + GA2"
+      },
+      "notes": {
+        "ru": "геометрическое объединение, применительно к однородным процессам",
+        "en": "geometric union, applied to homogeneous processes"
+      },
+      "tech_analog": {
+        "ru": "тройник, сварка, резка",
+        "en": "tee, welding, cutting"
+      },
+      "comments": {
+        "ru": "группа геометрических блоков, представленных алгебраической геометрией",
+        "en": "group of geometric blocks represented by algebraic geometry"
+      },
+      "options": {
+        "solid_angle": 1,
+        "curvature": 1,
+        "gaussian_curvature": 1,
+        "length": 1,
+        "area": 1,
+        "volume": 1
+      }
+    },
+    "process_12": {
+      "name": {
+        "ru": "накопление",
+        "en": "accumulation"
+      },
+      "operation": {
+        "direct": "GA -> o",
+        "backing": "o -> GA"
+      },
+      "notes": {
+        "ru": "вещество, энергия -> информация",
+        "en": "matter, energy -> information"
+      },
+      "tech_analog": {
+        "ru": "баки, магнитные ленты, склады",
+        "en": "tanks, magnetic tape storage"
+      },
+      "comments": {
+        "ru": "вторая производная по времени от атомной тормозной способности вещества (S_a) 913 1_Infostatics",
+        "en": "second time derivative of the stopping power of nuclear matter (S_a)"
+      },
+      "options": {
+        "time": 1,
+        "energy": 1,
+        "cell_913": 1,
+        "S_a": 1
+      }
+    },
+    "process_13": {
+      "name": {
+        "ru": "отображение",
+        "en": "mapping"
+      },
+      "operation": {
+        "direct": "GA -> i",
+        "backing": "i -> GA"
+      },
+      "notes": {
+        "ru": "вещество, энергия -> информация",
+        "en": "matter, energy -> information"
+      },
+      "tech_analog": {
+        "ru": "фотография",
+        "en": "photo"
+      },
+      "comments": {
+        "ru": "перенос проекции структуры, поток энергии, атомная тормозная способность вещества (S_a), связанные состояния",
+        "en": "transfer projection structure, energy flow, nuclear stopping power of matter (S_a), bound states"
+      },
+      "options": {
+        "mass": 1,
+        "energy": 1,
+        "solid_angle": 1,
+        "S_a": 1
+      }
+    },
+    "process_14": {
+      "name": {
+        "ru": "фиксирование",
+        "en": "clamping"
+      },
+      "operation": {
+        "direct": "GA -> o <- GA",
+        "backing": "GA <- o -> GA"
+      },
+      "notes": {
+        "ru": "уменьшение числа свобод",
+        "en": "reducing the number of freedoms"
+      },
+      "tech_analog": {
+        "ru": "оси, наручники, вилка",
+        "en": "axis, handcuffs, a fork"
+      },
+      "comments": {
+        "ru": "уравнение теоретической механики, векторная операция проекции, добавления или удаления линейного уравнения, составной кабель для каждой компоненты",
+        "en": "equation of theoretical mechanics, projection of a vector operation, adding or removing a linear equation, component cable for each dimension"
+      },
+      "options": {
+        "momentum": 1,
+        "length": 1,
+        "force": 1,
+        "time": 1
+      }
+    }
+  }
+}
