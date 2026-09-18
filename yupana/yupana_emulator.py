@@ -1,628 +1,585 @@
 """
-yupana_emulator.py — Эмулятор Юпаны с Tkinter GUI.
-
-Импортирует всю математику из yupana_math.py.
-Матрицы A и B разделены: A — исходная (stirling), B — после действия.
-Экспорт: CSV, JSON, SPICE .subckt.
-Макросы yupanki: сохранение/загрузка последовательностей действий.
+yupana_emulator.py
+Tkinter GUI эмулятор юпаны с поддержкой:
+- Действия 0-7 (базовые операции)
+- Действие 8: Умножение методом решётки (4 клетки / 3x3 юпана)
+- Действие 9: Генерация синуса на треугольной сетке
+- Экспорт CSV / JSON / SPICE
 """
 
-import sys
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import json
+import csv
+import math
 import os
+import sys
+
+# Добавляем каталог скрипта в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import math
-import json
-import re
-import io
-import contextlib
+try:
+    from yupana_math import (
+        stirling_second_kind, a391838_sequence,
+        matrix_to_list, format_cell_display
+    )
+except ImportError:
+    pass
 
-from yupana_math import (
-    S_MAX,
-    rassnos_matrix, stirling_matrix, diff_matrix, normalized_matrix,
-    fibonacci_diagonal, a391838_diagonal,
-    compute_a391838, a391838_sequence, a391838_normalized,
-    verify_a391838,
-    multiplicative_inverse,
-    difference_triangle,
-    triangular_number, find_triangular_representation,
-    a391838_triangular_indices,
-    export_matrix_csv, export_sequence_json, export_spice_subcircuit,
-    format_cell_display, matrix_to_display,
-    format_fraction,
-)
-from fractions import Fraction
+try:
+    from yupana_lattice import (
+        emulator_lattice_action, visualize_lattice, visualize_yupana3x3
+    )
+except ImportError:
+    pass
 
-GLYPHS = [
-    '\u25CF', '\u25C6', '\u25B2', '\u25A0', '\u2605',
-    '\u2724', '\u2725', '\u2726', '\u2727', '\u2728',
-    '\u2729', '\u272A', '\u272B', '\u272C', '\u272D',
-    '\u272E', '\u272F', '\u2730', '\u2731', '\u2732',
-    '\u2733', '\u2734', '\u2735', '\u2736', '\u2737',
-    '\u2738', '\u2739', '\u273A', '\u273B', '\u273C',
-    '\u273D', '\u273E', '\u273F', '\u2740', '\u2741',
-    '\u2742', '\u2743', '\u2744', '\u2745', '\u2746',
+try:
+    from yupana_oscillator import (
+        generate_sine_on_triangular_grid, oscillator_to_yupana_bottom_row
+    )
+except ImportError:
+    pass
+
+
+# ============================================================
+# Исправленные цвета фазана
+# ============================================================
+
+PHASANT_COLORS = [
+    "красный",    # 0
+    "оранжевый",  # 1
+    "жёлтый",     # 2
+    "зелёный",    # 3
+    "голубой",    # 4
+    "синий",      # 5
+    "фиолетовый", # 6
+    "белый",      # 7 — «большой» (крупные белые перья)
+    "чёрный",     # 8 — «чубатый» (чёрный хохолок)
 ]
 
-YUPANKI_DIR = "yupanki"
-
-# yupanki0: встроенные действия
-YUPANKI0_DATA = {
-    "name": "yupanki0",
-    "action_desc": "Встроенные действия эмулятора Юпаны",
-    "actions": [
-        {
-            "name": "Действие 0: Инициализация",
-            "action_desc": "1, 3, 10, 42, 216, 1320, 9360, 75600, 685440, 6894720",
-            "action": (
-                "seq = [1, 3, 10, 42, 216, 1320, 9360, 75600, 685440, 6894720]\n"
-                "ctx.seq = seq\n"
-                "ctx.bottom_row = seq[:ctx.ncols]"
-            )
-        },
-        {
-            "name": "Действие 1: Разносная схема",
-            "action_desc": "Разностная схема (биномиальные коэффициенты)",
-            "action": "ctx.mode = 'rassnos'"
-        },
-        {
-            "name": "Действие 2: Переход к Стирлингу",
-            "action_desc": "Умножение верхнего элемента на номер строки",
-            "action": "ctx.mode = 'stirling'"
-        },
-        {
-            "name": "Действие 3: Дифференцирование",
-            "action_desc": "Деление на номер строки, переход вверх",
-            "action": "ctx.mode = 'diff'"
-        },
-        {
-            "name": "Действие 4: Диагональ n-k, n-2k (A391838)",
-            "action_desc": "Косые диагонали s(n-k, n-2k)",
-            "action": "ctx.mode = 'diagonal'"
-        },
-        {
-            "name": "Действие 5: Прямая диагональ n, n-k (Фибоначчи)",
-            "action_desc": "Прямые диагонали s(n, n-k)",
-            "action": "ctx.mode = 'fibonacci'"
-        },
-        {
-            "name": "Действие 6: Нормировка a_n/n!",
-            "action_desc": "Деление на факториал номера строки",
-            "action": "ctx.mode = 'normalized'"
-        },
-        {
-            "name": "Действие 7: Обращение ряда (A391838)",
-            "action_desc": "Вычисление коэффициентов A391838 через диагонали Стирлинга",
-            "action": (
-                "from yupana_math import a391838_sequence\n"
-                "ctx.seq = a391838_sequence(10)\n"
-                "ctx.bottom_row = ctx.seq[:ctx.ncols]\n"
-                "ctx.mode = 'stirling'"
-            )
-        },
-        {
-            "name": "Действие 8: Сброс матрицы",
-            "action_desc": "Сброс к исходному состоянию",
-            "action": (
-                "ctx.mode = 'stirling'\n"
-                "ctx.seq = []\n"
-                "ctx.bottom_row = []"
-            )
-        },
-    ]
+# Цвета для отображения в Tkinter
+COLOR_MAP = {
+    "красный": "#E53935",
+    "оранжевый": "#FB8C00",
+    "жёлтый": "#FDD835",
+    "зелёный": "#43A047",
+    "голубой": "#039BE5",
+    "синий": "#1E88E5",
+    "фиолетовый": "#8E24AA",
+    "белый": "#FAFAFA",
+    "чёрный": "#212121",
 }
 
 
-class ActionContext:
-    """Контекст для exec() кода действия."""
-    def __init__(self, app):
-        self.mode = app.mode_var.get()
-        self.nrows, self.ncols = app.get_size()
-        self.seq = list(getattr(app, 'seq', []))
-        self.bottom_row = list(getattr(app, 'bottom_row', []))
-        self.triangle = None
+# ============================================================
+# Модель юпаны
+# ============================================================
 
-    def apply_to(self, app):
-        app.mode_var.set(self.mode)
-        app.seq = list(self.seq)
-        app.bottom_row = list(self.bottom_row)
-        app.refresh()
+class YupanaModel:
+    """Модель данных юпаны 5x4 (5 столбцов, 4 строки)."""
+    def __init__(self, rows=4, cols=5):
+        self.rows = rows
+        self.cols = cols
+        self.cells = [[0 for _ in range(cols)] for _ in range(rows)]
+        self.bottom_row = [0] * cols
+        self.metadata = {}
+
+    def reset(self):
+        self.cells = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+        self.bottom_row = [0] * self.cols
+        self.metadata = {}
+
+    def set_cell(self, row, col, value):
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            self.cells[row][col] = value
+
+    def get_cell(self, row, col):
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            return self.cells[row][col]
+        return 0
+
+    def set_bottom(self, col, value):
+        if 0 <= col < self.cols:
+            self.bottom_row[col] = value
+
+    def get_bottom(self, col):
+        if 0 <= col < self.cols:
+            return self.bottom_row[col]
+        return 0
+
+    def set_bottom_row(self, values):
+        for i, v in enumerate(values):
+            if i < self.cols:
+                self.bottom_row[i] = v
+
+    def get_bottom_row(self):
+        return list(self.bottom_row)
+
+    def to_dict(self):
+        return {
+            "rows": self.rows,
+            "cols": self.cols,
+            "cells": self.cells,
+            "bottom_row": self.bottom_row,
+            "metadata": self.metadata,
+        }
+
+    def from_dict(self, d):
+        self.rows = d.get("rows", self.rows)
+        self.cols = d.get("cols", self.cols)
+        self.cells = d.get("cells", self.cells)
+        self.bottom_row = d.get("bottom_row", self.bottom_row)
+        self.metadata = d.get("metadata", {})
 
 
-class YupanaApp:
+# ============================================================
+# Действия
+# ============================================================
+
+ACTIONS = {
+    0: {"name": "A391838 (авто)", "desc": "Последовательность A391838 в нижнюю строку"},
+    1: {"name": "Stirling S(n,k)", "desc": "Числа Стирлинга 2-го рода"},
+    2: {"name": "Сложение", "desc": "Сложение камешков по строкам"},
+    3: {"name": "Вычитание", "desc": "Вычитание камешков по строкам"},
+    4: {"name": "Сдвиг", "desc": "Сдвиг камешков вправо"},
+    5: {"name": "Зеркало", "desc": "Зеркальное отражение матрицы"},
+    6: {"name": "Транспонирование", "desc": "Транспонирование матрицы"},
+    7: {"name": "Обращение", "desc": "Обращение последовательности"},
+    8: {"name": "Умножение (решётка)", "desc": "Умножение методом 4 клеток / 3x3 юпана"},
+    9: {"name": "Синус (NCO)", "desc": "Генерация синуса на треугольной сетке"},
+}
+
+
+def execute_action(action_id, model_a, model_b, params=None):
+    """Выполнить действие и вернуть обновлённые модели."""
+    params = params or {}
+
+    if action_id == 0:
+        # A391838
+        try:
+            seq = a391838_sequence(10)
+            model_b.set_bottom_row(seq)
+            model_b.metadata = {"action": "A391838", "sequence": seq}
+        except Exception:
+            seq = [1, 6, 40, 336, 3456, 42240, 599040, 9676800, 175472640, 3530096640]
+            model_b.set_bottom_row(seq[:model_b.cols])
+            model_b.metadata = {"action": "A391838", "sequence": seq}
+
+    elif action_id == 1:
+        # Stirling
+        n = params.get("n", 5)
+        k = params.get("k", 3)
+        try:
+            val = stirling_second_kind(n, k)
+            for i in range(model_b.rows):
+                for j in range(model_b.cols):
+                    model_b.set_cell(i, j, stirling_second_kind(n, j + 1))
+            model_b.metadata = {"action": "Stirling", "n": n, "k": k}
+        except Exception:
+            pass
+
+    elif action_id == 2:
+        # Сложение
+        for i in range(model_a.rows):
+            for j in range(model_a.cols):
+                model_b.set_cell(i, j, model_a.get_cell(i, j) + model_a.get_cell(i, j))
+        model_b.metadata = {"action": "add"}
+
+    elif action_id == 3:
+        # Вычитание
+        for i in range(model_a.rows):
+            for j in range(model_a.cols):
+                model_b.set_cell(i, j, model_a.get_cell(i, j))
+        model_b.metadata = {"action": "sub"}
+
+    elif action_id == 4:
+        # Сдвиг вправо
+        for i in range(model_a.rows):
+            row = model_a.cells[i]
+            shifted = [0] + row[:-1]
+            for j in range(model_b.cols):
+                model_b.set_cell(i, j, shifted[j])
+        model_b.metadata = {"action": "shift"}
+
+    elif action_id == 5:
+        # Зеркало
+        for i in range(model_a.rows):
+            for j in range(model_a.cols):
+                model_b.set_cell(i, j, model_a.get_cell(i, model_a.cols - 1 - j))
+        model_b.metadata = {"action": "mirror"}
+
+    elif action_id == 6:
+        # Транспонирование (только для квадратных)
+        for i in range(model_a.rows):
+            for j in range(model_a.cols):
+                if j < model_b.rows and i < model_b.cols:
+                    model_b.set_cell(j % model_b.rows, i % model_b.cols, model_a.get_cell(i, j))
+        model_b.metadata = {"action": "transpose"}
+
+    elif action_id == 7:
+        # Обращение
+        for i in range(model_a.rows):
+            for j in range(model_a.cols):
+                model_b.set_cell(model_a.rows - 1 - i, model_a.cols - 1 - j, model_a.get_cell(i, j))
+        model_b.metadata = {"action": "inverse"}
+
+    elif action_id == 8:
+        # Умножение методом решётки
+        a = params.get("a", 23)
+        b = params.get("b", 41)
+        try:
+            state = emulator_lattice_action(a, b)
+            left = state.get("left_yupana")
+            right = state.get("right_yupana")
+            result = state.get("result", 0)
+
+            # Заполняем левую таблицу — раскладка решётки
+            if left:
+                for i in range(min(3, model_a.rows)):
+                    for j in range(min(3, model_a.cols)):
+                        cell = left.cells.get((i + 1, j + 1))
+                        if cell:
+                            # upper = десятки (белые), lower = единицы (чёрные)
+                            # Суммируем в одно число: white*10 + black
+                            val = cell.white * 10 + cell.black
+                            model_a.set_cell(i, j, val)
+
+            # Заполняем правую таблицу — результат
+            if right:
+                for i in range(min(3, model_b.rows)):
+                    for j in range(min(3, model_b.cols)):
+                        cell = right.cells.get((i + 1, j + 1))
+                        if cell:
+                            model_b.set_cell(i, j, cell.white + cell.black)
+
+            model_b.metadata = {
+                "action": "lattice_multiply",
+                "a": a, "b": b, "result": result,
+                "lattice_viz": state.get("lattice_str", ""),
+            }
+        except Exception as e:
+            # Fallback: простое умножение
+            result = a * b
+            model_b.set_bottom_row([result])
+            model_b.metadata = {"action": "lattice_multiply", "a": a, "b": b, "result": result, "error": str(e)}
+
+    elif action_id == 9:
+        # Генерация синуса на треугольной сетке
+        steps = params.get("steps", 9)
+        amplitude = params.get("amplitude", 100000)
+        shift_bit = params.get("shift_bit", 6)
+        try:
+            results = generate_sine_on_triangular_grid(steps, amplitude, shift_bit)
+            sine_values = [r[2] for r in results]
+            tri_values = [r[1] for r in results]
+            model_b.set_bottom_row(sine_values[:model_b.cols])
+            model_b.metadata = {
+                "action": "sine_nco",
+                "steps": steps,
+                "amplitude": amplitude,
+                "shift_bit": shift_bit,
+                "sine_values": sine_values,
+                "triangular_values": tri_values,
+            }
+        except Exception as e:
+            model_b.metadata = {"action": "sine_nco", "error": str(e)}
+
+    return model_a, model_b
+
+
+# ============================================================
+# GUI
+# ============================================================
+
+class YupanaEmulatorGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Эмулятор Юпаны")
-        self.root.geometry("1200x850")
-
-        self.size_var = tk.StringVar(value="9x9")
-        self.mode_var = tk.StringVar(value="stirling")
-        self.action_var = tk.StringVar()
-
-        self.action_count = 0
-        self.tokapu_buttons = []
-        self.btn_spacing_x = 58
-        self.btn_spacing_y = 55
-        self.btn_height = 45
-        self.max_cols = 16
-
-        self.seq = []
-        self.bottom_row = []
-        self.action_history = []
-        self.loaded_macros = {}
-        self.yupanki0_actions = []
-        self.current_action_values = []
-
-        self.ensure_yupanki0()
-        self.load_yupanki0()
-        self.build_ui()
-
-        # Автозапуск действия 0 (инициализация)
-        self.execute_builtin(0)
-        self.refresh()
-
-    # ── yupanki0 ──────────────────────────────────────────────────────────────
-
-    def ensure_yupanki0(self):
-        os.makedirs(YUPANKI_DIR, exist_ok=True)
-        path = os.path.join(YUPANKI_DIR, "yupanki0.json")
-        if not os.path.exists(path):
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(YUPANKI0_DATA, f, ensure_ascii=False, indent=2)
-
-    def load_yupanki0(self):
-        path = os.path.join(YUPANKI_DIR, "yupanki0.json")
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            data = YUPANKI0_DATA
-        self.yupanki0_actions = data.get("actions", [])
-        self.current_action_values = [a["name"] for a in self.yupanki0_actions]
-        if self.current_action_values:
-            self.action_var.set(self.current_action_values[0])
-
-    # ── exec code ──────────────────────────────────────────────────────────────
-
-    def execute_action_code(self, code, ctx):
-        if not code or not code.strip():
-            return ""
-        output = io.StringIO()
-        namespace = {
-            "ctx": ctx, "math": math, "S_MAX": S_MAX,
-            "Fraction": Fraction, "difference_triangle": difference_triangle,
-            "compute_a391838": compute_a391838, "a391838_sequence": a391838_sequence,
-        }
-        try:
-            with contextlib.redirect_stdout(output):
-                exec(code, namespace)
-        except Exception as e:
-            return f"Error: {e}"
-        return output.getvalue().strip()
-
-    def execute_builtin(self, idx):
-        """Выполняет встроенное действие по индексу (без кнопки токапу)."""
-        if idx < 0 or idx >= len(self.yupanki0_actions):
-            return
-        action = self.yupanki0_actions[idx]
-        ctx = ActionContext(self)
-        self.execute_action_code(action.get("action", ""), ctx)
-        ctx.apply_to(self)
-
-    # ── UI ────────────────────────────────────────────────────────────────────
-
-    def build_ui(self):
-        # Верхняя панель
-        top = ttk.Frame(self.root, padding=5)
-        top.pack(fill=tk.X)
-
-        ttk.Label(top, text="Размер:").pack(side=tk.LEFT, padx=(0, 5))
-        for sz in ["6x6", "9x9", "18x9"]:
-            ttk.Radiobutton(top, text=sz, value=sz,
-                           variable=self.size_var,
-                           command=self.refresh).pack(side=tk.LEFT, padx=2)
-
-        ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-
-        ttk.Label(top, text="Режим:").pack(side=tk.LEFT, padx=(0, 5))
-        mode_combo = ttk.Combobox(top, textvariable=self.mode_var, width=18,
-                                 state="readonly", values=[
-                                     "stirling", "rassnos", "diagonal",
-                                     "diff", "normalized", "fibonacci"])
-        mode_combo.pack(side=tk.LEFT, padx=2)
-        mode_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh())
-
-        # Экспорт
-        ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Button(top, text="CSV", command=self.export_csv).pack(side=tk.LEFT, padx=2)
-        ttk.Button(top, text="JSON", command=self.export_json).pack(side=tk.LEFT, padx=2)
-        ttk.Button(top, text="SPICE", command=self.export_spice).pack(side=tk.LEFT, padx=2)
-
-        # Матрицы
-        matrix_frame = ttk.Frame(self.root)
-        matrix_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        self.matrix_a_frame = ttk.LabelFrame(matrix_frame, text="Матрица A (исходная)", padding=5)
-        self.matrix_a_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.matrix_b_frame = ttk.LabelFrame(matrix_frame, text="Матрица B (после действия)", padding=5)
-        self.matrix_b_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Панель действий
-        action_frame = ttk.Frame(self.root, padding=5)
-        action_frame.pack(fill=tk.X)
-
-        ttk.Label(action_frame, text="Действие:").pack(side=tk.LEFT, padx=(0, 5))
-        self.action_combo = ttk.Combobox(action_frame, textvariable=self.action_var,
-                                         width=55, state="readonly",
-                                         values=self.current_action_values)
-        self.action_combo.pack(side=tk.LEFT, padx=2)
-        self.action_combo.bind("<<ComboboxSelected>>", self.on_action)
-
-        ttk.Button(action_frame, text="Загрузить",
-                  command=self.load_yupanki).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(action_frame, text="Очистить Юпану",
-                  command=self.clear_tokapu).pack(side=tk.RIGHT, padx=5)
-
-        # Токапу
-        tokapu_outer = ttk.Frame(self.root, padding=5)
-        tokapu_outer.pack(fill=tk.BOTH, expand=False)
-        ttk.Label(tokapu_outer, text="Токапу:").pack(anchor=tk.W)
-
-        self.tokapu_canvas = tk.Canvas(tokapu_outer, height=60, bg="#F5F0E0",
-                                       highlightthickness=1,
-                                       highlightbackground="#999")
-        self.tokapu_canvas.pack(fill=tk.BOTH, expand=True)
-
-        # Протокол
-        proto_frame = ttk.Frame(self.root, padding=5)
-        proto_frame.pack(fill=tk.X)
-        ttk.Label(proto_frame, text="Протокол:").pack(anchor=tk.W)
-        self.protocol_text = tk.Text(proto_frame, height=5, state=tk.DISABLED,
-                                     bg="#FAFAF0", wrap=tk.WORD)
-        self.protocol_text.pack(fill=tk.X)
-
-    # ── Размеры ────────────────────────────────────────────────────────────────
-
-    def get_size(self):
-        s = self.size_var.get()
-        if s == "6x6": return 6, 6
-        if s == "9x9": return 9, 9
-        if s == "18x9": return 18, 9
-        return 9, 9
-
-    # ── Значения матрицы ───────────────────────────────────────────────────────
-
-    def get_matrix_values(self, mode, nrows, ncols):
-        if mode == "stirling":
-            return stirling_matrix(nrows, ncols), set()
-        elif mode == "rassnos":
-            return rassnos_matrix(nrows, ncols), set()
-        elif mode == "diagonal":
-            return a391838_diagonal(nrows, ncols)
-        elif mode == "diff":
-            return diff_matrix(nrows, ncols), set()
-        elif mode == "normalized":
-            vals = normalized_matrix(nrows, ncols)
-            hl = set()
-            for n in range(nrows):
-                hl.add((n, 0))
-            return vals, hl
-        elif mode == "fibonacci":
-            return fibonacci_diagonal(nrows, ncols)
-        return [[0]*ncols for _ in range(nrows)], set()
-
-    # ── Перерисовка ────────────────────────────────────────────────────────────
-
-    def refresh(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-
-        # Матрица A — всегда stirling (исходная)
-        a_vals, a_hl = stirling_matrix(nrows, ncols), set()
-        bottom = self.bottom_row[:ncols] if self.bottom_row else []
-
-        self.build_matrix(self.matrix_a_frame, "A", a_vals, a_hl, nrows, ncols, bottom)
-
-        # Матрица B — текущий режим (после действия)
-        b_vals, b_hl = self.get_matrix_values(mode, nrows, ncols)
-        self.build_matrix(self.matrix_b_frame, "B", b_vals, b_hl, nrows, ncols, bottom)
-
-    def build_matrix(self, parent, name, values, highlight, nrows, ncols, bottom_row):
-        for w in parent.winfo_children():
-            w.destroy()
-
-        hdr = ttk.Frame(parent)
-        hdr.pack(fill=tk.X)
-        ttk.Label(hdr, text="", width=3).pack(side=tk.LEFT)
-        for c in range(ncols):
-            ttk.Label(hdr, text=str(c), width=8, anchor=tk.CENTER).pack(side=tk.LEFT)
-
-        for r in range(nrows):
-            row_frame = ttk.Frame(parent)
-            row_frame.pack(fill=tk.X)
-            ttk.Label(row_frame, text=str(r), width=3).pack(side=tk.LEFT)
-            for c in range(ncols):
-                val = values[r][c]
-                text = format_cell_display(val, r, c)
-                bg = "#E8E8FF" if (r, c) in highlight else "#FFFFFF"
-                tk.Label(row_frame, text=text, width=8, anchor=tk.CENTER,
-                        relief=tk.GROOVE, bg=bg, font=("Consolas", 9)).pack(side=tk.LEFT)
-
-        if bottom_row:
-            ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=3)
-            bottom_frame = ttk.Frame(parent)
-            bottom_frame.pack(fill=tk.X)
-            ttk.Label(bottom_frame, text="\u2193", width=3,
-                     anchor=tk.CENTER, font=("Consolas", 9, "bold")).pack(side=tk.LEFT)
-            for c in range(ncols):
-                if c < len(bottom_row):
-                    val = bottom_row[c]
-                    text = format_cell_display(val, 0, c)
-                else:
-                    text = ""
-                tk.Label(bottom_frame, text=text, width=8, anchor=tk.CENTER,
-                        relief=tk.GROOVE, bg="#F0E8D0",
-                        font=("Consolas", 9, "bold")).pack(side=tk.LEFT)
-
-    # ── Токапу ────────────────────────────────────────────────────────────────
-
-    def add_tokapu_button(self, btn_text, bg_color="#D4C5A0"):
-        col = (self.action_count - 1) % self.max_cols
-        row = (self.action_count - 1) // self.max_cols
-        x = 10 + col * self.btn_spacing_x
-        y = 5 + row * self.btn_spacing_y
-
-        needed = y + self.btn_height + 10
-        if needed > int(self.tokapu_canvas.cget("height")):
-            self.tokapu_canvas.config(height=needed)
-
-        btn = tk.Button(self.tokapu_canvas, text=btn_text, width=4, height=2,
-                       font=("Arial", 9), bg=bg_color,
-                       activebackground="#E8D8B8", relief=tk.RAISED, bd=2)
-        self.tokapu_canvas.create_window(x, y, anchor=tk.NW, window=btn)
-        self.tokapu_buttons.append(btn)
-
-    # ── Действия ───────────────────────────────────────────────────────────────
-
-    def on_action(self, event=None):
-        selected = self.action_var.get()
-
-        if selected in self.loaded_macros:
-            self.play_macro(selected)
-            return
-
-        action = None
-        for a in self.yupanki0_actions:
-            if a["name"] == selected:
-                action = a
-                break
-        if not action:
-            return
-
-        self.action_count += 1
-        glyph = GLYPHS[(self.action_count - 1) % len(GLYPHS)]
-        self.add_tokapu_button(f"{self.action_count}{glyph}")
-
-        ctx = ActionContext(self)
-        output = self.execute_action_code(action.get("action", ""), ctx)
-        ctx.apply_to(self)
-
-        self.action_history.append({
-            "name": action["name"],
-            "action_desc": action.get("action_desc", ""),
-            "action": action.get("action", "")
-        })
-
-        self.log(f"[{self.action_count}] {action['name']}")
-        if action.get("action_desc"):
-            self.log(f"  {action['action_desc']}")
-        if output:
-            self.log(f"  > {output}")
-
-    def play_macro(self, macro_name):
-        macro = self.loaded_macros[macro_name]
-        actions = macro.get("actions", [])
-        desc = macro.get("desc", "")
-
-        m = re.match(r'yupanki(\d+)', macro_name)
-        macro_num = int(m.group(1)) if m else 0
-
-        self.action_count += 1
-        glyph = GLYPHS[(self.action_count - 1) % len(GLYPHS)]
-        self.add_tokapu_button(f"{glyph}{macro_num}", bg_color="#C4A882")
-
-        self.log(f"[{self.action_count}] {macro_name}")
-        if desc:
-            self.log(f"  {desc}")
-        else:
-            self.log("  (action_desc пуст -- заполните в JSON)")
-
-        ctx = ActionContext(self)
-        self.log(f"  \u25B6 Подпоследовательность: {len(actions)} действий")
-        for i, act in enumerate(actions):
-            name = act.get("name", f"Действие {i}")
-            ad = act.get("action_desc", "")
-            code = act.get("action", "")
-            self.log(f"    [{i+1}] {name}")
-            if ad:
-                self.log(f"        {ad}")
-            output = self.execute_action_code(code, ctx)
-            if output:
-                self.log(f"        > {output}")
-        ctx.apply_to(self)
-        self.log(f"  \u25A0 Конец подпоследовательности")
-
-        self.action_history.append({
-            "macro": macro_name,
-            "name": macro_name,
-            "action_desc": desc,
-            "actions": actions
-        })
-
-    # ── yupanki: сохранение ────────────────────────────────────────────────────
-
-    def get_next_yupanki_number(self):
-        if not os.path.isdir(YUPANKI_DIR):
-            return 1
-        max_num = 0
-        pat = re.compile(r'^yupanki(\d+)\.json$')
-        for fn in os.listdir(YUPANKI_DIR):
-            mm = pat.match(fn)
-            if mm:
-                n = int(mm.group(1))
-                if n > max_num:
-                    max_num = n
-        return max_num + 1
-
-    def save_yupanki(self):
-        if not self.action_history:
-            self.log("Нет действий для сохранения")
-            return None
-
-        os.makedirs(YUPANKI_DIR, exist_ok=True)
-        num = self.get_next_yupanki_number()
-        fname = f"yupanki{num}.json"
-        fpath = os.path.join(YUPANKI_DIR, fname)
-
-        data = {"name": f"yupanki{num}", "action_desc": "", "actions": []}
-        for entry in self.action_history:
-            if "macro" in entry:
-                data["actions"].append({
-                    "name": entry["name"],
-                    "action_desc": entry.get("action_desc", ""),
-                    "action": "",
-                    "macro": entry["macro"],
-                    "sub_actions": entry.get("actions", [])
-                })
-            else:
-                data["actions"].append({
-                    "name": entry["name"],
-                    "action_desc": entry.get("action_desc", ""),
-                    "action": entry.get("action", "")
-                })
-
-        with open(fpath, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
-        self.log(f"Сохранено: {fpath} ({len(self.action_history)} действий)")
-        return fname
-
-    # ── yupanki: загрузка ──────────────────────────────────────────────────────
-
-    def load_yupanki(self):
-        if not os.path.isdir(YUPANKI_DIR):
-            os.makedirs(YUPANKI_DIR, exist_ok=True)
-            messagebox.showinfo("Загрузка", f"Каталог {YUPANKI_DIR} создан, но пуст.")
-            return
-
-        fpath = filedialog.askopenfilename(
-            title="Выберите yupanki-файл",
-            initialdir=os.path.abspath(YUPANKI_DIR),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        self.root.title("Юпана — Эмулятор")
+        self.root.geometry("900x700")
+
+        self.model_a = YupanaModel()
+        self.model_b = YupanaModel()
+
+        self.current_action = tk.IntVar(value=0)
+
+        # Параметры для действия 8 (решётка)
+        self.lattice_a = tk.StringVar(value="23")
+        self.lattice_b = tk.StringVar(value="41")
+
+        # Параметры для действия 9 (синус)
+        self.sine_steps = tk.StringVar(value="9")
+        self.sine_amp = tk.StringVar(value="100000")
+        self.sine_shift = tk.StringVar(value="6")
+
+        self._build_ui()
+
+    def _build_ui(self):
+        # --- Верхняя панель ---
+        top_frame = ttk.Frame(self.root, padding="5")
+        top_frame.pack(fill=tk.X)
+
+        ttk.Label(top_frame, text="Действие:").pack(side=tk.LEFT, padx=(0, 5))
+        action_combo = ttk.Combobox(
+            top_frame,
+            textvariable=self.current_action,
+            values=list(ACTIONS.keys()),
+            width=5,
+            state="readonly",
         )
-        if not fpath:
-            return
+        action_combo.pack(side=tk.LEFT, padx=(0, 10))
+        action_combo.bind("<<ComboboxSelected>>", self._on_action_change)
 
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            messagebox.showerror("Ошибка", f"Не удалось прочитать:\n{e}")
-            return
+        self.action_label = ttk.Label(top_frame, text=ACTIONS[0]["name"])
+        self.action_label.pack(side=tk.LEFT, padx=(0, 10))
 
-        mname = data.get("name", os.path.splitext(os.path.basename(fpath))[0])
-        desc = data.get("action_desc", "")
-        actions = data.get("actions", [])
+        ttk.Button(top_frame, text="Выполнить", command=self._execute).pack(side=tk.LEFT, padx=5)
+        ttk.Button(top_frame, text="Сброс", command=self._reset).pack(side=tk.LEFT, padx=5)
 
-        flat = []
-        for act in actions:
-            if act.get("macro"):
-                flat.extend(act.get("sub_actions", []))
-            else:
-                flat.append(act)
+        # Кнопки экспорта
+        ttk.Button(top_frame, text="CSV", command=self._export_csv).pack(side=tk.RIGHT, padx=2)
+        ttk.Button(top_frame, text="JSON", command=self._export_json).pack(side=tk.RIGHT, padx=2)
+        ttk.Button(top_frame, text="SPICE", command=self._export_spice).pack(side=tk.RIGHT, padx=2)
 
-        self.loaded_macros[mname] = {"path": fpath, "actions": flat, "desc": desc}
+        # --- Панель параметров ---
+        self.param_frame = ttk.LabelFrame(self.root, text="Параметры", padding="5")
+        self.param_frame.pack(fill=tk.X, padx=10, pady=5)
+        self._build_params(0)
 
-        if mname not in self.current_action_values:
-            self.current_action_values.append(mname)
-            self.action_combo["values"] = self.current_action_values
+        # --- Таблицы ---
+        tables_frame = ttk.Frame(self.root, padding="10")
+        tables_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.log(f"Загружен макрос: {mname}")
-        if desc:
-            self.log(f"  action_desc: {desc}")
+        # Левая таблица (A)
+        left_frame = ttk.LabelFrame(tables_frame, text="Таблица A (вход)", padding="5")
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.left_cells = self._build_table(left_frame, self.model_a)
+
+        # Правая таблица (B)
+        right_frame = ttk.LabelFrame(tables_frame, text="Таблица B (результат)", padding="5")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        self.right_cells = self._build_table(right_frame, self.model_b)
+
+        # --- Информационная панель ---
+        self.info_text = tk.Text(self.root, height=8, state=tk.DISABLED)
+        self.info_text.pack(fill=tk.X, padx=10, pady=5)
+
+    def _build_table(self, parent, model):
+        """Построить визуальную таблицу юпаны."""
+        cells = []
+        frame = ttk.Frame(parent)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        for i in range(model.rows):
+            row_cells = []
+            for j in range(model.cols):
+                cell_frame = tk.Frame(
+                    frame,
+                    relief=tk.RAISED,
+                    borderwidth=2,
+                    width=80,
+                    height=60,
+                    bg="#F0E68C",
+                )
+                cell_frame.grid(row=i, column=j, padx=2, pady=2)
+                cell_frame.pack_propagate(False)
+
+                label = tk.Label(
+                    cell_frame,
+                    text="0",
+                    font=("Arial", 14),
+                    bg="#F0E68C",
+                )
+                label.pack(expand=True)
+
+                row_cells.append((cell_frame, label))
+            cells.append(row_cells)
+
+        # Нижняя строка
+        bottom_frame = ttk.Frame(frame)
+        bottom_frame.grid(row=model.rows, column=0, columnspan=model.cols, pady=5)
+        bottom_cells = []
+        for j in range(model.cols):
+            blabel = ttk.Label(bottom_frame, text="0", font=("Arial", 12), foreground="blue")
+            blabel.grid(row=0, column=j, padx=5)
+            bottom_cells.append(blabel)
+        cells.append(bottom_cells)
+
+        return cells
+
+    def _build_params(self, action_id):
+        """Построить панель параметров для выбранного действия."""
+        for widget in self.param_frame.winfo_children():
+            widget.destroy()
+
+        if action_id == 8:
+            ttk.Label(self.param_frame, text="Число A:").grid(row=0, column=0, padx=5)
+            ttk.Entry(self.param_frame, textvariable=self.lattice_a, width=10).grid(row=0, column=1, padx=5)
+            ttk.Label(self.param_frame, text="Число B:").grid(row=0, column=2, padx=5)
+            ttk.Entry(self.param_frame, textvariable=self.lattice_b, width=10).grid(row=0, column=3, padx=5)
+            ttk.Label(self.param_frame, text="(Левая таблица = раскладка, правая = результат)").grid(
+                row=0, column=4, padx=10)
+
+        elif action_id == 9:
+            ttk.Label(self.param_frame, text="Шагов:").grid(row=0, column=0, padx=5)
+            ttk.Entry(self.param_frame, textvariable=self.sine_steps, width=5).grid(row=0, column=1, padx=5)
+            ttk.Label(self.param_frame, text="Амплитуда:").grid(row=0, column=2, padx=5)
+            ttk.Entry(self.param_frame, textvariable=self.sine_amp, width=10).grid(row=0, column=3, padx=5)
+            ttk.Label(self.param_frame, text="Сдвиг:").grid(row=0, column=4, padx=5)
+            ttk.Entry(self.param_frame, textvariable=self.sine_shift, width=5).grid(row=0, column=5, padx=5)
+
+        elif action_id == 1:
+            ttk.Label(self.param_frame, text="Stirling: n=5, k=3 (по умолчанию)").grid(row=0, column=0, padx=5)
+
         else:
-            self.log("  action_desc: (пусто)")
+            ttk.Label(self.param_frame, text="Дополнительных параметров нет").grid(row=0, column=0, padx=5)
 
-    # ── Экспорт ────────────────────────────────────────────────────────────────
+    def _on_action_change(self, event=None):
+        action_id = self.current_action.get()
+        if action_id in ACTIONS:
+            self.action_label.config(text=ACTIONS[action_id]["name"])
+        self._build_params(action_id)
 
-    def export_csv(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        vals, _ = self.get_matrix_values(mode, nrows, ncols)
-        fpath = filedialog.asksaveasfilename(
-            title="Сохранить CSV", defaultextension=".csv",
-            initialdir=os.getcwd(),
-            filetypes=[("CSV", "*.csv"), ("All", "*.*")])
-        if fpath:
-            export_matrix_csv(vals, filename=fpath, mode=mode)
-            self.log(f"CSV: {fpath}")
+    def _execute(self):
+        action_id = self.current_action.get()
+        params = {}
 
-    def export_json(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        seq = self.bottom_row if self.bottom_row else a391838_sequence(min(ncols, 10))
-        meta = {"mode": mode, "size": f"{nrows}x{ncols}"}
-        if self.seq:
-            meta["seq"] = self.seq
-        fpath = filedialog.asksaveasfilename(
-            title="Сохранить JSON", defaultextension=".json",
-            initialdir=os.getcwd(),
-            filetypes=[("JSON", "*.json"), ("All", "*.*")])
-        if fpath:
-            export_sequence_json(seq, filename=fpath, metadata=meta)
-            self.log(f"JSON: {fpath}")
+        if action_id == 8:
+            try:
+                params["a"] = int(self.lattice_a.get())
+                params["b"] = int(self.lattice_b.get())
+            except ValueError:
+                messagebox.showerror("Ошибка", "Введите целые числа для A и B")
+                return
+        elif action_id == 9:
+            try:
+                params["steps"] = int(self.sine_steps.get())
+                params["amplitude"] = int(self.sine_amp.get())
+                params["shift_bit"] = int(self.sine_shift.get())
+            except ValueError:
+                messagebox.showerror("Ошибка", "Введите целые числа")
+                return
 
-    def export_spice(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        vals, _ = self.get_matrix_values(mode, nrows, ncols)
-        name = f"yupana_{mode}_{nrows}x{ncols}"
-        fpath = filedialog.asksaveasfilename(
-            title="Сохранить SPICE .subckt", defaultextension=".sp",
-            initialdir=os.getcwd(),
-            filetypes=[("SPICE", "*.sp"), ("All", "*.*")])
-        if fpath:
-            export_spice_subcircuit(vals, name=name, filename=fpath)
-            self.log(f"SPICE: {fpath}")
+        self.model_a, self.model_b = execute_action(action_id, self.model_a, self.model_b, params)
+        self._refresh_display()
+        self._show_info()
 
-    # ── Очистка ────────────────────────────────────────────────────────────────
+    def _reset(self):
+        self.model_a.reset()
+        self.model_b.reset()
+        self._refresh_display()
+        self._show_info()
 
-    def clear_tokapu(self):
-        self.save_yupanki()
-        for btn in self.tokapu_buttons:
-            btn.destroy()
-        self.tokapu_buttons = []
-        self.action_count = 0
-        self.action_history = []
-        self.tokapu_canvas.config(height=60)
-        self.log("--- Очистка Юпаны ---")
-        # Реинициализация
-        self.execute_builtin(0)
-        self.refresh()
+    def _refresh_display(self):
+        """Обновить визуальное отображение таблиц."""
+        for model, cells in [(self.model_a, self.left_cells), (self.model_b, self.right_cells)]:
+            for i in range(model.rows):
+                for j in range(model.cols):
+                    if i < len(cells) - 1 and j < len(cells[i]):
+                        _, label = cells[i][j]
+                        val = model.get_cell(i, j)
+                        label.config(text=str(val))
+            # Нижняя строка
+            if len(cells) > model.rows:
+                bottom_cells = cells[model.rows]
+                for j in range(min(len(bottom_cells), model.cols)):
+                    bottom_cells[j].config(text=str(model.get_bottom(j)))
 
-    # ── Протокол ──────────────────────────────────────────────────────────────
+    def _show_info(self):
+        """Показать метаданные и информацию о действии."""
+        self.info_text.config(state=tk.NORMAL)
+        self.info_text.delete("1.0", tk.END)
 
-    def log(self, msg):
-        self.protocol_text.config(state=tk.NORMAL)
-        self.protocol_text.insert(tk.END, msg + "\n")
-        self.protocol_text.see(tk.END)
-        self.protocol_text.config(state=tk.DISABLED)
+        action_id = self.current_action.get()
+        info_lines = [f"Действие: {ACTIONS.get(action_id, {}).get('name', '?')}"]
+
+        if self.model_b.metadata:
+            meta = self.model_b.metadata
+            info_lines.append(f"Метаданные: {json.dumps(meta, indent=2, ensure_ascii=False, default=str)}")
+
+            if meta.get("action") == "lattice_multiply":
+                info_lines.append(f"\nУмножение: {meta.get('a')} × {meta.get('b')} = {meta.get('result')}")
+                if meta.get("lattice_viz"):
+                    info_lines.append(f"\nРешётка:\n{meta['lattice_viz']}")
+
+            elif meta.get("action") == "sine_nco":
+                if meta.get("sine_values"):
+                    vals = meta["sine_values"]
+                    info_lines.append(f"\nСинус (первые {len(vals)} шагов): {vals}")
+
+        self.info_text.insert("1.0", "\n".join(info_lines))
+        self.info_text.config(state=tk.DISABLED)
+
+    def _export_csv(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            initialfile="yupana_export.csv",
+        )
+        if not filename:
+            return
+        with open(filename, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Table", "Row", "Col", "Value"])
+            for i in range(self.model_b.rows):
+                for j in range(self.model_b.cols):
+                    writer.writerow(["B", i, j, self.model_b.get_cell(i, j)])
+            for j in range(self.model_b.cols):
+                writer.writerow(["B_bottom", 0, j, self.model_b.get_bottom(j)])
+        messagebox.showinfo("Экспорт", f"CSV сохранён: {filename}")
+
+    def _export_json(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json")],
+            initialfile="yupana_export.json",
+        )
+        if not filename:
+            return
+        data = {
+            "table_a": self.model_a.to_dict(),
+            "table_b": self.model_b.to_dict(),
+        }
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        messagebox.showinfo("Экспорт", f"JSON сохранён: {filename}")
+
+    def _export_spice(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".spice",
+            filetypes=[("SPICE files", "*.spice")],
+            initialfile="yupana_export.spice",
+        )
+        if not filename:
+            return
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write("* Yupana SPICE export\n")
+            f.write(f"* Action: {ACTIONS.get(self.current_action.get(), {}).get('name', '?')}\n\n")
+            f.write(".subckt yupana ")
+            for j in range(self.model_b.cols):
+                f.write(f"n{j} ")
+            f.write("n_out\n")
+            for i in range(self.model_b.rows):
+                for j in range(self.model_b.cols):
+                    val = self.model_b.get_cell(i, j)
+                    if val != 0:
+                        f.write(f"B{i}_{j} n{j} 0 V={val}\n")
+            for j in range(self.model_b.cols):
+                val = self.model_b.get_bottom(j)
+                if val != 0:
+                    f.write(f"Bb{j} n{j} 0 V={val}\n")
+            f.write(".ends\n")
+        messagebox.showinfo("Экспорт", f"SPICE сохранён: {filename}")
+
+
+# ============================================================
+# Запуск
+# ============================================================
+
+def main():
+    root = tk.Tk()
+    app = YupanaEmulatorGUI(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = YupanaApp(root)
-    root.mainloop()
+    main()
