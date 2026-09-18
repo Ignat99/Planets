@@ -1,0 +1,10 @@
+"4_Magnetostatics": {
+    "name": "Магнитостатика",
+    "level": 4,
+    "scale": "Eps_0*c^2",
+    "cells": {
+        "9": {"symbol": "L", "desc": "момент_импульса"},
+        "9161": {"symbol": "", "arrows": ["->"]},
+        ...
+    }
+}
