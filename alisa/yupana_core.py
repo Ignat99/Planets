@@ -38,7 +38,7 @@ def stirling_second_kind_val(n: int, k: int) -> int:
 # ============================================================
 # Действие 13: Поднятие столбцов
 # lifted[r][k] = c(r+k, k)
-# Косые диагонали n-2k=x → столбцы
+# Косые диагонали n-2k=x -> столбцы
 # ============================================================
 
 def lift_columns(table: List[List[int]], size: int, N: int) -> List[List[int]]:
@@ -219,3 +219,28 @@ def transformation_journal() -> list:
             "описание": "triangular[r][c] = c(c, c-r). Условие c >= r эквивалентно n >= 2k."
         }
     ]
+
+
+# ============================================================
+# Рефакторинг: Действие 1 (Stirling S(n,k))
+# ============================================================
+
+def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
+    """
+    Рефакторинг Действия 1: Stirling S(n,k).
+    Извлечённая логика из execute_action, ветка action_id == 1.
+    Заполняет model_b числами Стирлинга 2-го рода S(i+1, j+1).
+    Возвращает (model_a, model_b).
+    """
+
+    # Начало блока Действие 1
+    if action_id == 1:
+        n = params.get("n", 5)
+        for i in range(model_b.rows):
+            for j in range(model_b.cols):
+                model_b.set_cell(i, j, stirling_second_kind_val(i + 1, j + 1))
+        model_b.metadata = {"action": "Stirling", "n": n}
+        return model_a, model_b
+    # Конец блока Действие 1
+
+    raise NotImplementedError(f"Действие {action_id} не реализовано в act1")
