@@ -785,5 +785,3 @@ def execute_action_refactoring_act16(action_id, model_a, model_b, params=None):
             model_b.metadata = {"action": "shift_rows_left", "error": str(e)}
         return model_a, model_b
     raise NotImplementedError(f"Действие {action_id} не реализовано в act16")
-
-
