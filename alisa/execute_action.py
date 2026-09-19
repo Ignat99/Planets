@@ -63,24 +63,89 @@ def execute_action(action_id, model_a, model_b, params=None):
     # Конец блока Действие 0
 
     # Начало блока Действие 1
-    elif action_id == 1:
+#    elif action_id == 1:
         # Вызов функции из yupana_core action_refactoring_act1
-        result = execute_action_refactoring_act1(action_id, model_a, model_b, params)
+#        result = execute_action_refactoring_act1(action_id, model_a, model_b, params)
         # Конец вызова функции из yupana_core action_refactoring_act1
+
+#        table = result["table"]
+#        n = result["n"]
+#        for i in range(model_b.rows):
+#            for j in range(model_b.cols):
+#                if i <= n and j <= n:
+#                    model_b.set_cell(i, j, table[i][j])
+#                else:
+#                    model_b.set_cell(i, j, 0)
+#        for j in range(model_b.cols):
+#            model_b.set_bottom(j, 0)
+#        model_b.metadata = {"action": "Stirling", "n": n}
+    # Конец блока Действие 1
+
+    # Начало блока Действие 1
+    elif action_id == 1:
+        result = execute_action_refactoring_act1(action_id, model_a, model_b, params)
 
         table = result["table"]
         n = result["n"]
+        N = result["N"]
+        core_steps = result["core_steps"]
+
+        # Заполняем финальное состояние таблицы
         for i in range(model_b.rows):
             for j in range(model_b.cols):
-                if i <= n and j <= n:
+                if i <= N and j <= N:
                     model_b.set_cell(i, j, table[i][j])
                 else:
                     model_b.set_cell(i, j, 0)
         for j in range(model_b.cols):
             model_b.set_bottom(j, 0)
-        model_b.metadata = {"action": "Stirling", "n": n}
-    # Конец блока Действие 1
 
+        # Конвертация core-шагов → GUI-шаги
+        gui_steps = []
+        for cs in core_steps:
+            step_n = cs["n"]
+            step_k = cs["k"]
+
+            # right — снимок таблицы на этом шаге
+            right = {}
+            if step_n is not None and step_k is not None:
+                for r in range(min(8, N + 1)):
+                    for col in range(min(8, N + 1)):
+                        if table[r][col] > 0 and r <= step_n:
+                            # Включаем только ячейки, уже вычисленные к этому шагу
+                            if r < step_n or (r == step_n and col <= step_k):
+                                right[(r, col)] = table[r][col]
+            else:
+                # Финальный шаг — вся таблица
+                for r in range(min(8, N + 1)):
+                    for col in range(min(8, N + 1)):
+                        if table[r][col] > 0:
+                            right[(r, col)] = table[r][col]
+
+            # highlight — текущая ячейка
+            highlight = []
+            if step_n is not None and step_k is not None:
+                if step_n < 8 and step_k < 8:
+                    highlight = [(step_n, step_k)]
+
+            gui_steps.append({
+                "left": {},
+                "right": right,
+                "highlight": highlight,
+                "text": cs["text"]
+            })
+
+        model_b.metadata = {
+            "action": "Stirling",
+            "n": n,
+            "steps_history": gui_steps,
+            "lattice_viz": (
+                "=== Таблица Стирлинга I рода ===\n"
+                "Формула: c(n,k) = c(n-1,k-1) + (n-1)*c(n-1,k)\n"
+                "n — строка (первый индекс), k — столбец (второй индекс)"
+            )
+        }
+    # Конец блока Действие 1
 
 
     # Начало блока Действие 2
