@@ -64,25 +64,24 @@ def execute_action(action_id, model_a, model_b, params=None):
 
     # Начало блока Действие 1
     elif action_id == 1:
-        n = params.get("n", 5)
         # Вызов функции из yupana_core action_refactoring_act1
-        execute_action_refactoring_act1(action_id, model_a, model_b, params)
+        result = execute_action_refactoring_act1(action_id, model_a, model_b, params)
         # Конец вызова функции из yupana_core action_refactoring_act1
 
-        # Размещение результата в нижней строке Юпаны (последняя строка сетки)
-        last_row = model_b.rows - 1
-        for j in range(model_b.cols):
-            val = stirling_second_kind(last_row + 1, j + 1)
-            model_b.set_cell(last_row, j, val)
-        # Остальные строки — нули
-        for i in range(last_row - 2):
+        table = result["table"]
+        n = result["n"]
+        for i in range(model_b.rows):
             for j in range(model_b.cols):
-                model_b.set_cell(i, j, 0)
-        # Нижняя строка (вне сетки) — нули
+                if i <= n and j <= n:
+                    model_b.set_cell(i, j, table[i][j])
+                else:
+                    model_b.set_cell(i, j, 0)
         for j in range(model_b.cols):
             model_b.set_bottom(j, 0)
         model_b.metadata = {"action": "Stirling", "n": n}
     # Конец блока Действие 1
+
+
 
     # Начало блока Действие 2
     elif action_id == 2:
