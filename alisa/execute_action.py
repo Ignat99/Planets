@@ -90,10 +90,10 @@ def execute_action(action_id, model_a, model_b, params=None):
         N = result["N"]
         core_steps = result["core_steps"]
 
-        # Заполняем финальное состояние таблицы
+        # Заполняем финальное состояние таблицы — только до n
         for i in range(model_b.rows):
             for j in range(model_b.cols):
-                if i <= N and j <= N:
+                if i <= n and j <= n:
                     model_b.set_cell(i, j, table[i][j])
                 else:
                     model_b.set_cell(i, j, 0)
@@ -106,19 +106,23 @@ def execute_action(action_id, model_a, model_b, params=None):
             step_n = cs["n"]
             step_k = cs["k"]
 
-            # right — снимок таблицы на этом шаге
+            # Пропускаем шаги, выходящие за предел n
+            if step_n is not None and step_n > n:
+                continue
+
+            # right — снимок таблицы на этом шаге, только до n
             right = {}
             if step_n is not None and step_k is not None:
-                for r in range(min(8, N + 1)):
-                    for col in range(min(8, N + 1)):
-                        if table[r][col] > 0 and r <= step_n:
+                for r in range(min(8, n + 1)):
+                    for col in range(min(8, n + 1)):
+                        if table[r][col] > 0:
                             # Включаем только ячейки, уже вычисленные к этому шагу
                             if r < step_n or (r == step_n and col <= step_k):
                                 right[(r, col)] = table[r][col]
             else:
-                # Финальный шаг — вся таблица
-                for r in range(min(8, N + 1)):
-                    for col in range(min(8, N + 1)):
+                # Финальный шаг — вся таблица до n
+                for r in range(min(8, n + 1)):
+                    for col in range(min(8, n + 1)):
                         if table[r][col] > 0:
                             right[(r, col)] = table[r][col]
 
@@ -142,10 +146,12 @@ def execute_action(action_id, model_a, model_b, params=None):
             "lattice_viz": (
                 "=== Таблица Стирлинга I рода ===\n"
                 "Формула: c(n,k) = c(n-1,k-1) + (n-1)*c(n-1,k)\n"
-                "n — строка (первый индекс), k — столбец (второй индекс)"
+                "n — строка (первый индекс), k — столбец (второй индекс)\n"
+                "Построено строк: " + str(n + 1) + " (0.." + str(n) + ")"
             )
         }
-    # Конец блока Действие 1
+    # Конец блока Действия 1
+
 
 
     # Начало блока Действие 2
