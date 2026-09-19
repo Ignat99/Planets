@@ -276,25 +276,21 @@ def execute_action_refactoring_act0(action_id, model_a, model_b, params=None):
 
 
 # ============================================================
-# Рефакторинг: Действие 1 (Stirling S(n,k))
+# Рефакторинг: Действие 1 (беззнаковые числа Стирлинга 1 рода)
 # ============================================================
 
 def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
     """
-    Рефакторинг Действия 1: Stirling S(n,k).
-    Извлечённая логика из execute_action, ветка action_id == 1.
-    Заполняет model_b числами Стирлинга 2-го рода S(i+1, j+1).
-    Возвращает (model_a, model_b).
+    Рефакторинг Действия 1: беззнаковые числа Стирлинга I рода c(n,k).
+    Чистая математика: строит таблицу c(n,k) для n,k = 0..N.
+    Возвращает {"table": [[...]], "n": n}.
     """
 
     # Начало блока Действие 1
     if action_id == 1:
         n = params.get("n", 5)
-        for i in range(model_b.rows):
-            for j in range(model_b.cols):
-                model_b.set_cell(i, j, stirling_second_kind_val(i + 1, j + 1))
-        model_b.metadata = {"action": "Stirling", "n": n}
-        return model_a, model_b
+        table = stirling_unsigned_first(n)
+        return {"table": table, "n": n}
     # Конец блока Действие 1
 
     raise NotImplementedError(f"Действие {action_id} не реализовано в act1")
@@ -662,5 +658,3 @@ def execute_action_refactoring_act16(action_id, model_a, model_b, params=None):
             model_b.metadata = {"action": "shift_rows_left", "error": str(e)}
         return model_a, model_b
     raise NotImplementedError(f"Действие {action_id} не реализовано в act16")
-
-
