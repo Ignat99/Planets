@@ -17,6 +17,7 @@ from yupana_core import (
     stirling_diagonal, stirling_diagonal_components,
     a391838_row, compute_a391838_sequence,
     transformation_journal,
+    execute_action_refactoring_act1,
 )
 
 from yupana_lattice import (
@@ -55,6 +56,51 @@ def check_true(name, actual):
     else:
         _tests_failed.append(f"FAIL: {name}: expected True, got {actual}")
         print(f"  FAIL: {name}: expected True, got {actual}")
+
+
+# ============================================================
+# Минимальная модель для тестирования рефакторинга
+# ============================================================
+
+class _MockModel:
+    """Упрощённая модель с тем же интерфейсом, что YupanaModel в эмуляторе."""
+    def __init__(self, rows=4, cols=5):
+        self.rows = rows
+        self.cols = cols
+        self.cells = [[0] * cols for _ in range(rows)]
+        self.bottom_row = [0] * cols
+        self.metadata = {}
+
+    def reset(self):
+        self.cells = [[0] * self.cols for _ in range(self.rows)]
+        self.bottom_row = [0] * self.cols
+        self.metadata = {}
+
+    def set_cell(self, row, col, value):
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            self.cells[row][col] = value
+
+    def get_cell(self, row, col):
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            return self.cells[row][col]
+        return 0
+
+    def set_bottom(self, col, value):
+        if 0 <= col < self.cols:
+            self.bottom_row[col] = value
+
+    def get_bottom(self, col):
+        if 0 <= col < self.cols:
+            return self.bottom_row[col]
+        return 0
+
+    def set_bottom_row(self, values):
+        for i, v in enumerate(values):
+            if i < self.cols:
+                self.bottom_row[i] = v
+
+    def get_bottom_row(self):
+        return list(self.bottom_row)
 
 
 # ============================================================
@@ -133,7 +179,7 @@ def test_lower_columns():
 
 
 def test_roundtrip_lift_lower():
-    """Round-trip: lift → lower = исходная таблица."""
+    """Round-trip: lift -> lower = исходная таблица."""
     N = 10
     c = stirling_unsigned_first(N)
     size = 10
@@ -185,7 +231,7 @@ def test_shift_rows_left():
 
 
 def test_full_roundtrip():
-    """Полный round-trip: lift → shift_right → shift_left → lower = исходная."""
+    """Полный round-trip: lift -> shift_right -> shift_left -> lower = исходная."""
     N = 10
     c = stirling_unsigned_first(N)
     size = 10
@@ -194,7 +240,7 @@ def test_full_roundtrip():
     lifted_back = shift_rows_left(tri, size)
     original = lower_columns(lifted_back, size, N)
 
-    # Проверяем только значения, помещающиеся в size×size сетку
+    # Проверяем только значения, помещающиеся в size x size сетку
     for n in range(size):
         for k in range(size):
             if n <= N and (n - k) + k < size and k + (n - k) < size:
@@ -370,7 +416,7 @@ def test_emulator_row_shift_left():
 
 
 def test_emulator_full_roundtrip():
-    """Полный round-trip через эмуляторы: 13 → 15 → 16 → 14."""
+    """Полный round-trip через эмуляторы: 13 -> 15 -> 16 -> 14."""
     r_lift = emulator_column_lift_action(7)
     lifted = r_lift["steps"][-1]["right"]
 
@@ -451,6 +497,43 @@ def test_property_journal_steps():
 
 
 # ============================================================
+# Тест рефакторинга Действия 1
+# ============================================================
+
+def test_execute_action_refactoring_act1():
+    """
+    Тест рефакторинга Действия 1: Stirling S(n,k).
+    Проверяет, что execute_action_refactoring_act1 заполняет model_b
+    числами Стирлинга 2-го рода S(i+1, j+1) и возвращает обе модели.
+    """
+    model_a = _MockModel(rows=4, cols=5)
+    model_b = _MockModel(rows=4, cols=5)
+
+    result_a, result_b = execute_action_refactoring_act1(
+        1, model_a, model_b, {"n": 5}
+    )
+
+    # Проверяем возвращаемые значения — это те же объекты
+    check("act1 returns model_a", result_a is model_a, True)
+    check("act1 returns model_b", result_b is model_b, True)
+
+    # Проверяем заполнение model_b числами Стирлинга 2-го рода
+    for i in range(4):
+        for j in range(5):
+            expected = stirling_second_kind_val(i + 1, j + 1)
+            check(f"act1 S({i+1},{j+1})", result_b.get_cell(i, j), expected)
+
+    # Проверяем метаданные
+    check("act1 metadata action", result_b.metadata.get("action"), "Stirling")
+    check("act1 metadata n", result_b.metadata.get("n"), 5)
+
+    # Проверяем, что model_a не изменилась (все нули)
+    for i in range(4):
+        for j in range(5):
+            check(f"act1 model_a[{i}][{j}] unchanged", result_a.get_cell(i, j), 0)
+
+
+# ============================================================
 # Запуск
 # ============================================================
 
@@ -479,6 +562,9 @@ def run_all_tests():
         ]),
         ("yupana_core — журнал", [
             test_transformation_journal,
+        ]),
+        ("yupana_core — рефакторинг", [
+            test_execute_action_refactoring_act1,
         ]),
         ("yupana_lattice — умножение", [
             test_lattice_multiply,
@@ -511,7 +597,7 @@ def run_all_tests():
     print("\n" + "=" * 60)
     print(f"ИТОГО: {_tests_passed}/{_tests_total} passed")
     if _tests_passed == _tests_total:
-        print("ВСЕ ТЕСТЫ ЗЕЛЁНЫЕ ✓")
+        print("ВСЕ ТЕСТЫ ЗЕЛЁНЫЕ")
     else:
         print(f"ПРОВАЛЕНО: {_tests_total - _tests_passed}")
         for f in _tests_failed:
