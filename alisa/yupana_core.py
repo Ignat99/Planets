@@ -261,21 +261,15 @@ def transformation_journal() -> list:
 def execute_action_refactoring_act0(action_id, model_a, model_b, params=None):
     """
     Рефакторинг Действия 0: a391838_sequence.
-    Извлечённая логика из execute_action, ветка action_id == 0.
-    Заполняет последнюю строку model_b числами a391838_sequence.
-    Возвращает (model_a, model_b).
+    Чистая математика: вычисляет последовательность и возвращает её.
+    Не трогает model — только читает cols для размера.
+    Возвращает {"seq": [...]}.
     """
 
     # Начало блока Действие 0
     if action_id == 0:
         seq = compute_a391838_sequence(model_b.cols)
-#        model_b.set_bottom_row(seq)
-        # Должно быть (данные в последнюю строку клеток):
-        # Размещение результата в нижней строке Юпаны (последняя строка сетки)
-#        last_row = model_b.rows - 1
-#        for j in range(model_b.cols):
-#            model_b.set_cell(last_row, j, seq[j])
-        return model_a, model_b
+        return {"seq": seq}
     # Конец блока Действие 0
 
     raise NotImplementedError(f"Действие {action_id} не реализовано в act0")
