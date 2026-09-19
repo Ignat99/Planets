@@ -56,6 +56,13 @@ try:
 except ImportError:
     def generate_sine_on_triangular_grid(s, a, sb): return []
 
+# Импорт функции рефакторинга Действия 1 из yupana_core
+try:
+    from yupana_core import execute_action_refactoring_act1
+except ImportError:
+    def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
+        raise ImportError("yupana_core не найден. Функция execute_action_refactoring_act1 должна быть в yupana_core.py")
+
 
 PHASANT_COLORS = ["красный", "оранжевый", "жёлтый", "зелёный", "голубой", "синий", "фиолетовый", "белый", "чёрный"]
 COLOR_MAP = {
@@ -152,11 +159,7 @@ def execute_action(action_id, model_a, model_b, params=None):
 
     # Начало блока Действие 1
     elif action_id == 1:
-        n = params.get("n", 5)
-        for i in range(model_b.rows):
-            for j in range(model_b.cols):
-                model_b.set_cell(i, j, stirling_second_kind(i + 1, j + 1))
-        model_b.metadata = {"action": "Stirling", "n": n}
+        execute_action_refactoring_act1(action_id, model_a, model_b, params)
     # Конец блока Действие 1
 
     elif action_id == 2:
@@ -734,21 +737,6 @@ class YupanaEmulatorGUI:
                 f.write("* Yupana Netlist\n.subckt yupana_core\n")
                 f.write(".ends\n")
             messagebox.showinfo("Успех", "SPICE файл создан")
-
-
-# ============================================================
-# Рефакторинг: Действие 1 (Stirling S(n,k))
-# Извлечённые функции — объявлены, но не вызываются.
-# Тела функций находятся в yupana_core.py.
-# ============================================================
-
-def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
-    """
-    Рефакторинг Действия 1: Stirling S(n,k).
-    Извлечённая логика из execute_action, ветка action_id == 1.
-    Заполняет model_b числами Стирлинга 2-го рода S(i+1, j+1).
-    """
-    raise NotImplementedError("Тело функции в yupana_core.py")
 
 
 if __name__ == "__main__":
