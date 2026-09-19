@@ -164,6 +164,16 @@ class YupanaEmulatorGUI:
         elif action_id == 1:
             ttk.Label(self.param_frame, text="N (строки таблицы):").grid(row=0, column=0, padx=5)
             ttk.Entry(self.param_frame, textvariable=self.stirling_n, width=5).grid(row=0, column=1, padx=5)
+            ttk.Label(self.param_frame, text="Задержка (мс):").grid(row=0, column=2, padx=(20, 5))
+            speed_scale = ttk.Scale(
+                self.param_frame, from_=100, to=3000,
+                variable=self.animation_speed,
+                orient=tk.HORIZONTAL, length=150
+            )
+            speed_scale.grid(row=0, column=3, padx=5)
+            speed_label = ttk.Label(self.param_frame, text=str(self.animation_speed.get()) + " мс")
+            speed_label.grid(row=0, column=4, padx=5)
+            speed_scale.config(command=lambda val: speed_label.config(text=str(int(float(val))) + " мс"))
 
         elif action_id == 9:
             ttk.Label(self.param_frame, text="Шагов:").grid(row=0, column=0, padx=5)
@@ -220,7 +230,7 @@ class YupanaEmulatorGUI:
         if has_history:
             print("[ОТЛАДКА GUI] Количество шагов: " + str(len(meta["steps_history"])))
 
-        if action_id in (10, 11, 12, 13, 14, 15, 16) and has_history:
+        if action_id in (1, 10, 11, 12, 13, 14, 15, 16) and has_history:
             print("[ОТЛАДКА GUI] Запуск анимации для действия " + str(action_id))
             self._run_steps_animation(0)
         else:
@@ -287,7 +297,7 @@ class YupanaEmulatorGUI:
                     self.model_b.set_cell(r, c, val)
                 for (r, c), val in step_data.get("temporary_right", {}).items():
                     self.model_b.set_cell(r, c, val)
-        elif action_id in (13, 14, 15, 16):
+        elif action_id in (1, 13, 14, 15, 16):
             right_data = step_data.get("right", {})
             print("[ОТЛАДКА АНИМАЦИИ] right_data: " + str(len(right_data)) + " ячеек")
             for (r, c), val in right_data.items():
@@ -444,3 +454,4 @@ class YupanaEmulatorGUI:
                 f.write("* Yupana Netlist\n.subckt yupana_core\n")
                 f.write(".ends\n")
             messagebox.showinfo("Успех", "SPICE файл создан")
+
