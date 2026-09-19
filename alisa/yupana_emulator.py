@@ -107,7 +107,7 @@ class YupanaModel:
 
     def from_dict(self, d):
         self.rows = d.get("rows", self.rows)
-        self.cols = d.get("cols", d.get("cols", self.cols))
+        self.cols = d.get("cols", self.cols)
         self.cells = d.get("cells", self.cells)
         self.bottom_row = d.get("bottom_row", self.bottom_row)
         self.metadata = d.get("metadata", {})
@@ -150,12 +150,14 @@ def execute_action(action_id, model_a, model_b, params=None):
         model_b.set_bottom_row(seq)
         model_b.metadata = {"action": "A391838", "sequence": seq}
 
+    # Начало блока Действие 1
     elif action_id == 1:
         n = params.get("n", 5)
         for i in range(model_b.rows):
             for j in range(model_b.cols):
                 model_b.set_cell(i, j, stirling_second_kind(i + 1, j + 1))
         model_b.metadata = {"action": "Stirling", "n": n}
+    # Конец блока Действие 1
 
     elif action_id == 2:
         for i in range(model_a.rows):
@@ -732,6 +734,22 @@ class YupanaEmulatorGUI:
                 f.write("* Yupana Netlist\n.subckt yupana_core\n")
                 f.write(".ends\n")
             messagebox.showinfo("Успех", "SPICE файл создан")
+
+
+# ============================================================
+# Рефакторинг: Действие 1 (Stirling S(n,k))
+# Извлечённые функции — объявлены, но не вызываются.
+# Тела функций находятся в yupana_core.py.
+# ============================================================
+
+def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
+    """
+    Рефакторинг Действия 1: Stirling S(n,k).
+    Извлечённая логика из execute_action, ветка action_id == 1.
+    Заполняет model_b числами Стирлинга 2-го рода S(i+1, j+1).
+    """
+    raise NotImplementedError("Тело функции в yupana_core.py")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
