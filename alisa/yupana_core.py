@@ -42,14 +42,120 @@ except ImportError as e:
 
 
 
-def stirling_unsigned_first(N: int) -> List[List[int]]:
-    """Таблица беззнаковых чисел Стирлинга I рода c(n,k) для n,k = 0..N."""
+def stirling_unsigned_first(N: int, with_steps: bool = False):
+    """
+    Таблица беззнаковых чисел Стирлинга I рода c(n,k) для n,k = 0..N.
+
+    Обозначения:
+        n — номер строки (первый/верхний индекс в паре (n, k))
+        k — номер столбца (второй/правый индекс в паре (n, k))
+
+    Рекуррентная формула:
+        c(n, k) = c(n-1, k-1) + (n-1) * c(n-1, k)
+
+    Базовый случай:
+        c(0, 0) = 1
+        c(n, 0) = 0  при n > 0
+        c(0, k) = 0  при k > 0
+
+    Смысл формулы (на примере c(4, 2)):
+        c(4, 2) = c(3, 1) + 3 * c(3, 2)
+                = 2      + 3 * 3
+                = 11
+
+    Пошаговое объяснение для c(4, 2):
+        Член 1: c(n-1, k-1) = c(3, 1) = 2
+            Элемент n=4 образует собственный цикл (фиксированную точку).
+            Берём число перестановок n-1 элементов в k-1 циклов.
+
+        Член 2: (n-1) * c(n-1, k) = 3 * c(3, 2) = 3 * 3 = 9
+            Элемент n=4 вставляется в один из (n-1)=3 существующих
+            циклов перестановки n-1 элементов в k циклов.
+
+        Сумма: 2 + 9 = 11 — число перестановок 4 элементов ровно в 2 цикла.
+
+    Если with_steps=True, возвращает кортеж (table, steps_history),
+    где steps_history — список словарей с полями:
+        step, n, k, term_1, term_2, result, text
+    """
     c = [[0] * (N + 1) for _ in range(N + 1)]
     c[0][0] = 1
+
+    steps_history = []
+
+    if with_steps:
+        steps_history.append({
+            "step": 0,
+            "n": 0,
+            "k": 0,
+            "term_1": None,
+            "term_2": None,
+            "result": 1,
+            "text": (
+                "Базовый случай: c(0,0) = 1.\n"
+                "  n=0 — строка 0, k=0 — столбец 0.\n"
+                "  Единственная перестановка нуля элементов — пустая,\n"
+                "  содержащая 0 циклов. Поэтому c(0,0)=1.\n"
+                "  Все остальные ячейки нулевой строки и нулевого столбца = 0."
+            )
+        })
+
+    step_idx = 1
     for n in range(1, N + 1):
         for k in range(1, n + 1):
-            c[n][k] = c[n - 1][k - 1] + (n - 1) * c[n - 1][k]
+            # Член 1: c(n-1, k-1) — по диагонали слева-сверху
+            # Элемент n образует собственный цикл длины 1
+            term_1 = c[n - 1][k - 1]
+
+            # Член 2: (n-1) * c(n-1, k) — сверху, умноженное на (n-1)
+            # Элемент n вставляется в один из (n-1) существующих циклов
+            term_2 = (n - 1) * c[n - 1][k]
+
+            c[n][k] = term_1 + term_2
+
+            if with_steps:
+                steps_history.append({
+                    "step": step_idx,
+                    "n": n,
+                    "k": k,
+                    "term_1": term_1,
+                    "term_2": term_2,
+                    "result": c[n][k],
+                    "text": (
+                        f"c({n},{k}):\n"
+                        f"  n={n} (строка {n}), k={k} (столбец {k})\n"
+                        f"  Член 1: c(n-1, k-1) = c({n-1}, {k-1}) = {term_1}\n"
+                        f"    — элемент {n} образует собственный цикл\n"
+                        f"  Член 2: (n-1) * c(n-1, k) = {n-1} * c({n-1}, {k}) = {n-1} * {c[n-1][k]} = {term_2}\n"
+                        f"    — элемент {n} вставляется в один из {n-1} существующих циклов\n"
+                        f"  Сумма: {term_1} + {term_2} = {c[n][k]}\n"
+                        f"  Итог: c({n},{k}) = {c[n][k]}"
+                    )
+                })
+                step_idx += 1
+
+    if with_steps:
+        steps_history.append({
+            "step": step_idx,
+            "n": None,
+            "k": None,
+            "term_1": None,
+            "term_2": None,
+            "result": None,
+            "text": (
+                f"Таблица Стирлинга I рода построена для N={N}.\n"
+                f"Размер: {N+1}x{N+1}.\n"
+                f"Обозначения: n (строка) — первый индекс, k (столбец) — второй.\n"
+                f"Формула: c(n,k) = c(n-1,k-1) + (n-1)*c(n-1,k)\n"
+                f"Контрольные значения:\n"
+                f"  c(1,1)={c[1][1]}, c(2,1)={c[2][1]}, c(3,2)={c[3][2]}, "
+                f"c(4,2)={c[4][2]}, c(5,3)={c[5][3]}, c(7,4)={c[7][4]}"
+            )
+        })
+        return c, steps_history
+
     return c
+
 
 
 def stirling_second_kind_val(n: int, k: int) -> int:
@@ -279,7 +385,7 @@ def execute_action_refactoring_act0(action_id, model_a, model_b, params=None):
 # Рефакторинг: Действие 1 (беззнаковые числа Стирлинга 1 рода)
 # ============================================================
 
-def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
+#def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
     """
     Рефакторинг Действия 1: беззнаковые числа Стирлинга I рода c(n,k).
     Чистая математика: строит таблицу c(n,k) для n,k = 0..N.
@@ -287,11 +393,32 @@ def execute_action_refactoring_act1(action_id, model_a, model_b, params=None):
     """
 
     # Начало блока Действие 1
-    if action_id == 1:
-        n = params.get("n", 5)
-        table = stirling_unsigned_first(n)
-        return {"table": table, "n": n}
+#    if action_id == 1:
+#        n = params.get("n", 5)
+#        table = stirling_unsigned_first(n)
+#        return {"table": table, "n": n}
     # Конец блока Действие 1
+
+
+def execute_action_refactoring_act1(action_id, model_a, model_b, params):
+    """
+    Действие 1: таблица беззнаковых чисел Стирлинга I рода.
+    Возвращает table, n и core-формат steps_history.
+    """
+    from yupana_core import stirling_unsigned_first
+
+    n = params.get("n", 5)
+    N = max(n, 7)
+
+    table, core_steps = stirling_unsigned_first(N, with_steps=True)
+
+    return {
+        "table": table,
+        "n": n,
+        "N": N,
+        "core_steps": core_steps
+    }
+
 
     raise NotImplementedError(f"Действие {action_id} не реализовано в act1")
 
@@ -658,3 +785,5 @@ def execute_action_refactoring_act16(action_id, model_a, model_b, params=None):
             model_b.metadata = {"action": "shift_rows_left", "error": str(e)}
         return model_a, model_b
     raise NotImplementedError(f"Действие {action_id} не реализовано в act16")
+
+
