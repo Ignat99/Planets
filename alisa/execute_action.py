@@ -32,6 +32,8 @@ try:
         execute_action_refactoring_act14,
         execute_action_refactoring_act15,
         execute_action_refactoring_act16,
+        execute_action_refactoring_act17,
+
     )
 except ImportError:
     print(f"[ОТЛАДКА] Не удалось импортировать yupana_core: {e}")
@@ -49,6 +51,10 @@ def execute_action(action_id, model_a, model_b, params=None):
     elif action_id in (13, 14, 15, 16):
         model_a.reset()
         model_b.reset()
+    elif action_id in (17,):
+        model_a.reset()
+        model_b.reset()
+
 
     # Начало блока Действие 0
     if action_id == 0:
@@ -270,5 +276,13 @@ def execute_action(action_id, model_a, model_b, params=None):
         execute_action_refactoring_act16(action_id, model_a, model_b, params)
         # Конец вызова функции из yupana_core action_refactoring_act16
     # Конец блока Действие 16
+
+    # Начало блока Действие 17
+    elif action_id == 17:
+        # Вызов функции из yupana_core action_refactoring_act17
+        result = execute_action_refactoring_act17(action_id, model_a, model_b, params)
+        # обработка result — заполнение model_b факториалами
+        # Конец вызова функции из yupana_core action_refactoring_act17
+    # Конец блока Действие 17
 
     return model_a, model_b
