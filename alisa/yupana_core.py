@@ -31,6 +31,7 @@ try:
         emulator_column_lower_action,
         emulator_shift_rows_right_action,
         emulator_shift_rows_left_action,
+        emulator_factorial_action_17,
     )
 except ImportError as e:
     print(f"[ОТЛАДКА] Не удалось импортировать yupana_lattice: {e}")
@@ -785,3 +786,28 @@ def execute_action_refactoring_act16(action_id, model_a, model_b, params=None):
             model_b.metadata = {"action": "shift_rows_left", "error": str(e)}
         return model_a, model_b
     raise NotImplementedError(f"Действие {action_id} не реализовано в act16")
+
+# ============================================================
+# Рефакторинг: Действие 17 (Факториал n!)
+# ============================================================
+
+def execute_action_refactoring_act17(action_id, model_a, model_b, params=None):
+    """
+    Рефакторинг Действия 17: факториал n! через сумму строки Стирлинга I рода.
+    Вызывает emulator_factorial_action из yupana_lattice.
+    """
+    if action_id == 17:
+        n_val = params.get("a", 7)
+        try:
+            state = emulator_factorial_action_17(n_val)
+            model_b.metadata = {
+                "action": "factorial",
+                "a": n_val,
+                "result": state.get("result", 0),
+                "steps_history": state.get("steps", []),
+                "lattice_viz": state.get("lattice_str", "")
+            }
+        except Exception as e:
+            model_b.metadata = {"action": "factorial", "error": str(e)}
+        return model_a, model_b
+    raise NotImplementedError(f"Действие {action_id} не реализовано в act17")
