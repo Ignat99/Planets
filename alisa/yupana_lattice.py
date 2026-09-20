@@ -8,6 +8,8 @@ import math
 import json
 from fractions import Fraction
 
+#from yupana_core import stirling_unsigned_first
+
 
 # ============================================================
 # Вспомогательная функция: таблица Стирлинга I рода
@@ -896,6 +898,177 @@ def export_journal_text():
         lines.append(f"  Описание: {описание}")
         lines.append("")
     return "\n".join(lines)
+
+
+# ============================================================
+# Действие 17: (зарезервировано)
+# Стандартное имя: emulator_factorial_action_action_17_doom
+# Вызывается из execute_action.py через yupana_core.execute_action_refactoring_act17
+# ============================================================
+
+def emulator_factorial_action_17_doom(n_target: int) -> dict:
+    """
+    Действие 17: заглушка со стандартным интерфейсом.
+    Возвращает steps_history, result, lattice_str — как все остальные emulator_*_action.
+    """
+    steps_history = [{
+        "left": {},
+        "right": {},
+        "highlight": [],
+        "text": "Действие 17: не определено. Заглушка."
+    }]
+
+    return {
+        "steps": steps_history,
+        "result": 0,
+        "lattice_str": "=== Действие 17: заглушка ==="
+    }
+
+# ============================================================
+# Действие 17: Факториал n!
+# Стандартное имя: emulator_factorial_action_action_17
+# Вызывается из execute_action.py через yupana_core.execute_action_refactoring_act17
+# ============================================================
+
+def emulator_factorial_action_17(n_target: int) -> dict:
+    """
+    Действие 17: Вычисление факториала n! с пошаговой анимацией.
+    Левая юпана: множители 1, 2, 3, ..., n в строке i, столбец 0.
+    Правая юпана: i! в строке i, столбцы 0..i — треугольное заполнение.
+    """
+    import math
+
+    steps_history = []
+
+    steps_history.append({
+        "left": {},
+        "right": {},
+        "highlight": [],
+        "text": f"Шаг 0: Вычисление {n_target}!"
+    })
+
+    accumulated_left = {}
+    accumulated_right = {}
+
+    for i in range(n_target):
+        factor = i + 1
+        fact_i = math.factorial(i)
+
+        accumulated_left[(i, 0)] = factor
+
+        for col in range(i + 1):
+            accumulated_right[(i, col)] = fact_i
+
+        highlight = [(i, col) for col in range(i + 1)]
+
+        steps_history.append({
+            "left": dict(accumulated_left),
+            "right": dict(accumulated_right),
+            "highlight": highlight,
+            "text": f"Шаг {i + 1}: строка {i}, {i}! = {fact_i}"
+        })
+
+    final_result = math.factorial(n_target)
+
+    steps_history.append({
+        "left": dict(accumulated_left),
+        "right": dict(accumulated_right),
+        "highlight": [],
+        "text": f"Финал: {n_target}! = {final_result}"
+    })
+
+    return {
+        "steps": steps_history,
+        "result": final_result,
+        "lattice_str": f"=== Факториал ===\n{n_target}! = {final_result}"
+    }
+
+
+# ============================================================
+# Действие 17: Факториал через Стирлинга I рода
+# n! = Σ c(n,k), k=0..n
+# Стандартное имя: emulator_factorial_action_17
+# ============================================================
+
+
+
+def emulator_factorial_action_17_Stirling(n_target: int) -> dict:
+    """
+    Действие 17: Факториал как сумма строки Стирлинга I рода.
+    Показывает распределение n! по n подциклам Стирлинга.
+    Возвращает steps_history, result, lattice_str — как все остальные emulator_*_action.
+    """
+    if n_target < 0:
+        raise ValueError("n_target должен быть >= 0")
+
+    N = max(n_target, 7)
+#    stirling = stirling_unsigned_first(N)
+
+    steps_history = []
+
+    left_start = {}
+    for r in range(min(8, N + 1)):
+        for col in range(min(8, N + 1)):
+            if stirling[r][col] > 0:
+#                left_start[(r, col)] = stirling[r][col]
+                pass
+
+    steps_history.append({
+        "left": dict(left_start),
+        "right": {},
+        "highlight": [],
+        "text": f"Шаг 0: Таблица Стирлинга I рода c(n,k).\n"
+                f"Расчёт факториала n={n_target} как суммы строки."
+    })
+
+    row_sum = 0
+    selected = []
+
+    for k in range(n_target + 1):
+        s_val = stirling[n_target][k]
+        row_sum += s_val
+        selected.append((n_target, k, s_val))
+
+        step_right = {}
+        for idx, (sr, sc, sv) in enumerate(selected):
+            display_row = min(sr, 7)
+            display_col = min(sc, 7)
+            step_right[(display_row, display_col)] = sv
+
+        steps_history.append({
+            "left": dict(left_start),
+            "right": dict(step_right),
+            "highlight": [(min(sr, 7), min(sc, 7)) for sr, sc, _ in selected],
+            "text": f"Шаг {k + 1}: c({n_target},{k}) = {s_val}\n"
+                    f" Накопленная сумма: {row_sum}"
+        })
+
+    final_result = math.factorial(n_target)
+
+    assert row_sum == final_result, \
+        f"Несовпадение: сумма строки {row_sum} vs {n_target}! = {final_result}"
+
+    final_right = {}
+    for idx, (sr, sc, sv) in enumerate(selected):
+        display_row = min(idx, 7)
+        final_right[(display_row, 0)] = sv
+
+    steps_history.append({
+        "left": dict(left_start),
+        "right": dict(final_right),
+        "highlight": [],
+        "text": f"Финал: " + " + ".join(str(sv) for _, _, sv in selected) +
+                f" = {final_result}\n"
+                f"{n_target}! = {final_result} = сумма строки {n_target} таблицы Стирлинга"
+    })
+
+    return {
+        "steps": steps_history,
+        "result": final_result,
+        "lattice_str": f"=== Факториал через Стирлинга I рода ===\n"
+                       f"{n_target}! = {final_result}"
+    }
+
 
 
 # ============================================================
