@@ -96,6 +96,7 @@ class YupanaEmulatorGUI:
             (14, "14:Опуск"),
             (15, "15:Вправо"),
             (16, "16:Влево"),
+            (17, "16:Факториал"),
         ]
         for val, text in radio_actions:
             rb = tk.Radiobutton(
@@ -251,8 +252,8 @@ class YupanaEmulatorGUI:
 
         t = THEMES[self.current_theme]
 
-        if action_id in (8, 10, 11, 12, 13, 14, 15, 16):
-            label_text = "Параметр n:" if action_id in (11, 12, 13, 14, 15, 16) else "Число A:"
+        if action_id in (8, 10, 11, 12, 13, 14, 15, 16, 17):
+            label_text = "Параметр n:" if action_id in (11, 12, 13, 14, 15, 16, 17) else "Число A:"
             ttk.Label(self.param_frame, text=label_text).grid(row=0, column=0, padx=5)
             tk.Entry(
                 self.param_frame, textvariable=self.lattice_a, width=10,
@@ -270,8 +271,8 @@ class YupanaEmulatorGUI:
                     font=("Consolas", 11), relief=tk.FLAT, bd=2
                 ).grid(row=0, column=3, padx=5)
 
-            if action_id in (10, 11, 12, 13, 14, 15, 16) and self.current_theme == "light":
-                col_offset = 2 if action_id in (11, 12, 13, 14, 15, 16) else 4
+            if action_id in (10, 11, 12, 13, 14, 15, 16, 17) and self.current_theme == "light":
+                col_offset = 2 if action_id in (11, 12, 13, 14, 15, 16, 17) else 4
                 ttk.Label(self.param_frame, text="Задержка (мс):").grid(row=0, column=col_offset, padx=(20, 5))
                 speed_scale = ttk.Scale(
                     self.param_frame, from_=100, to=3000,
@@ -448,7 +449,7 @@ class YupanaEmulatorGUI:
     def _execute(self):
         action_id = self.current_action.get()
         params = {}
-        if action_id in (8, 10, 11, 12, 13, 14, 15, 16):
+        if action_id in (8, 10, 11, 12, 13, 14, 15, 16, 17):
             try:
                 params["a"] = int(self.lattice_a.get())
                 if action_id in (8, 10):
@@ -486,7 +487,7 @@ class YupanaEmulatorGUI:
         if has_history:
             print("[ОТЛАДКА GUI] Количество шагов: " + str(len(meta["steps_history"])))
 
-        if action_id in (1, 10, 11, 12, 13, 14, 15, 16) and has_history:
+        if action_id in (1, 10, 11, 12, 13, 14, 15, 16, 17) and has_history:
             print("[ОТЛАДКА GUI] Запуск анимации для действия " + str(action_id))
             self._stop_play()
             self.is_playing = True
@@ -563,7 +564,7 @@ class YupanaEmulatorGUI:
                     self.model_b.set_cell(r, c, val)
                 for (r, c), val in step_data.get("temporary_right", {}).items():
                     self.model_b.set_cell(r, c, val)
-        elif action_id in (1, 13, 14, 15, 16):
+        elif action_id in (1, 13, 14, 15, 16, 17):
             right_data = step_data.get("right", {})
             print("[ОТЛАДКА АНИМАЦИИ] right_data: " + str(len(right_data)) + " ячеек")
             for (r, c), val in right_data.items():
@@ -651,7 +652,7 @@ class YupanaEmulatorGUI:
                                 label.config(bg=t["cell_bg"], foreground=t["cell_fg"])
 
                         # Подсветка для действий 11-16 (левая таблица — выделение)
-                        elif action_id in (11, 12, 13, 14, 15, 16) and is_left_table:
+                        elif action_id in (11, 12, 13, 14, 15, 16, 17) and is_left_table:
                             highlight_cells = self.model_b.metadata.get("highlight_cells_current", [])
                             if (i, j) in highlight_cells:
                                 cell_frame.config(bg=t["highlight_bg"])
@@ -779,3 +780,4 @@ class YupanaEmulatorGUI:
                 self.current_step_idx,
                 self.current_history
             )
+
