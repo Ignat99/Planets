@@ -357,9 +357,18 @@ def run_animation_in_toplevel(parent, start_date=None):
     lbl_val.pack(side="left", padx=5)
 
 
-    # Кнопка Пауза/Продолжить
-    btn_pause = tk.Button(ctrl_frame, text="Пауза", bg="#e0e0e0", width=8,
-                          command=lambda: toggle_pause())
+    # Кнопка Пауза/Продолжить: салатовый фон, символы || / ▶, с рамкой
+    btn_pause = tk.Button(
+        ctrl_frame,
+        text="||",                 # начальный текст — «пауза»
+        bg="#81C784",              # салатовый цвет (Material Light Green 300)
+        fg="#000000",              # чёрный текст для контраста
+        font=("Arial", 10, "bold"),
+        width=3,
+        relief="raised",           # рамка (эффект выпуклости)
+        bd=2,                      # толщина рамки
+        command=lambda: toggle_pause()
+    )
     btn_pause.pack(side="left", padx=5)
 
     is_paused = False
@@ -367,13 +376,16 @@ def run_animation_in_toplevel(parent, start_date=None):
     def toggle_pause():
         nonlocal is_paused
         if is_paused:
-            btn_pause.config(text="Пауза")
+#            btn_pause.config(text="▶")
+            btn_pause.config(text="||")
             ani.event_source.start()
             is_paused = False
         else:
-            btn_pause.config(text="Продолжить")
+            btn_pause.config(text="▶")
+#            btn_pause.config(text="||")
             ani.event_source.stop()
             is_paused = True
+
 
 
     def get_days_from_scale(val):

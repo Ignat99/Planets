@@ -16,6 +16,7 @@
 import math
 import ephem
 import datetime
+#from datetime import datetime, timedelta
 
 # ------------------------------------------------------------------------------
 # ГЛОБАЛЬНЫЕ НАСТРОЙКИ НАБЛЮДАТЕЛЯ И НЕБЕСНОГО ТЕЛА
@@ -168,11 +169,45 @@ def analemma_xy_cable(date):
 
     return (mod_x, mod_y)
 
+def analemma_classic(date):
+    """
+    Классическая аналемма: уравнение времени (X) vs склонение (Y).
+
+    X — уравнение времени в градусах (±~5°)
+    Y — склонение в градусах (±~23.5° для Солнца)
+
+    Возвращает (eq_time_deg, declination_deg)
+    """
+    observer.date = ephem.date(date)
+    astro_body.compute(observer)
+
+    # Склонение (Y)
+    dec = deg_per_rad * float(astro_body.dec)
+
+    # Уравнение времени через прямое восхождение
+    # Среднее солнце: ra_mean = 280.460 + 0.9856474 * n (в градусах),
+    # где n — дни от J2000
+    # Но проще: eq_time = (среднее солнечное время) - (истинное солнечное время)
+    # Через ephem: разница между hour angle of mean sun и apparent sun
+
+    # Прямое восхождение Солнца (в градусах)
+    ra_sun = deg_per_rad * float(astro_body.ra)
+
+    # Среднее прямое восхождение (линейное по времени от J2000)
+    jd = ephem.date(date) + 15018.5  # дни от 2000/01/01
+    ra_mean = (280.460 + 0.9856474 * jd) % 360.0
+
+    # Уравнение времени (в градусах): разница между средним и истинным RA
+    eq_time = (ra_mean - ra_sun + 180) % 360 - 180
+
+    return (eq_time, dec)
+
+
 # ------------------------------------------------------------------------------
 # СБОР ДАННЫХ АНАЛЕММЫ ДЛЯ MATPLOTLIB
 # ------------------------------------------------------------------------------
 def compute_analemma(year=None, hours=None, days=None,
-                     use_cable=False, above_horizon_only=True):
+                     use_cable=False, above_horizon_only=True, classic=False):
     """
     Вычисляет массив точек аналеммы для построения графика в matplotlib.
 
@@ -208,8 +243,13 @@ def compute_analemma(year=None, hours=None, days=None,
     else:
         active_days = [d for d in range(1, len(includeD)) if includeD[d] == 1]
 
+
     # Выбор функции расчёта
-    calc_func = analemma_xy_cable if use_cable else analemma_xy
+#    calc_func = analemma_xy_cable if use_cable else analemma_xy
+    if classic:
+        calc_func = analemma_classic
+    else:
+        calc_func = analemma_xy_cable if use_cable else analemma_xy
 
     # Сбор данных
     result = []
@@ -218,7 +258,13 @@ def compute_analemma(year=None, hours=None, days=None,
         for m in range(1, 13):
             for d in active_days:
                 if is_valid_date(int(my_year), m, d):
-                    date_str = '{0:s}/{1:d}/{2:d} {3:d}:00'.format(my_year, m, d, h)
+# Без биений
+#                    date_str = '{0:s}/{1:d}/{2:d} {3:d}:00'.format(my_year, m, d, h)
+# Биения и завал фронтов
+                    hour_int = int(h)
+                    minute_int = int(round((h - hour_int) * 60))
+                    date_str = '{0:s}/{1:d}/{2:d} {3:d}:{4:02d}'.format(my_year, m, d, hour_int, minute_int)
+
                     x, y = calc_func(date_str)
                     if above_horizon_only and y <= 0:
                         continue
@@ -228,6 +274,7 @@ def compute_analemma(year=None, hours=None, days=None,
 
     return result
 
+#def compute_analemma_for_time(dt, use_cable=False, classic=False):
 def compute_analemma_for_time(dt, use_cable=False):
     """
     Вычисляет одну точку аналеммы для заданного момента времени.
@@ -241,6 +288,18 @@ def compute_analemma_for_time(dt, use_cable=False):
     """
     # Преобразование datetime в строку формата ephem
     date_str = dt.strftime('%Y/%m/%d %H:%M:%S')
+
+
+# Биения.
+#    hour_int = int(h)
+#    minute_int = int(round((h - hour_int) * 60))
+#    date_str = '{0:s}/{1:d}/{2:d} {3:d}:{4:02d}'.format(my_year, m, d, hour_int, minute_int)
+
+
+
+#    if classic:
+#        return analemma_classic(date_str)
+#    el
     if use_cable:
         return analemma_xy_cable(date_str)
     else:
