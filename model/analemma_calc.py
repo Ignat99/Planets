@@ -18,6 +18,11 @@ import ephem
 import datetime
 #from datetime import datetime, timedelta
 
+from analemma_array import (
+    PLANET_EPHEM_MAP,
+    analemma_state
+)
+
 # ------------------------------------------------------------------------------
 # ГЛОБАЛЬНЫЕ НАСТРОЙКИ НАБЛЮДАТЕЛЯ И НЕБЕСНОГО ТЕЛА
 # ------------------------------------------------------------------------------
@@ -37,7 +42,7 @@ my_year = str(datetime.datetime.now().year)
 # Массивы выбора часов и дней (1 — включено, 0 — выключено)
 # По умолчанию: полдень (12:00) и дни 1, 11, 21 каждого месяца
 includeH = [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]
-show_allH = 0  # флаг «показать все часы»
+show_allH = 1  # флаг «показать все часы»
 includeD = [0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0]
 show_allD = 0  # флаг «показать все дни»
 
@@ -124,157 +129,16 @@ def analemma_xy(date):
     adjtime = ephem.date(ephem.date(date) - float(observer.lon) * (12.0 / math.pi) * ephem.hour)
     observer.date = adjtime
     astro_body.compute(observer)
+    print(astro_body.alt, astro_body.az)
     x = deg_per_rad * float(astro_body.az)
     y = deg_per_rad * float(astro_body.alt)
     return (x, y)
 
-def analemma_xy_cable(date):
-    """
-    Расчёт координат с эвристическими фазовыми поправками.
-
-    Ключевая функция для анимации: учитывает фазу (минуты/секунды),
-    добавляет стоячие волны, имитирующие:
-      — годовое сжатие (wave_core) — пико-мезонный резонанс
-      — коронарный джет (wave_jet) — высокочастотная модуляция
-
-    Это позволяет демонстрировать «завал фронта» на аналемме
-    при изменении времени суток и сезона.
-
-    Параметры:
-        date — строка или объект ephem.date
-
-    Возвращает:
-        (mod_azimuth, mod_altitude) — модифицированные координаты в градусах
-    """
-    # 1. Базовый астрономический расчёт (азимут + высота)
-    adjtime = ephem.date(ephem.date(date) - float(observer.lon) * (12.0 / math.pi) * ephem.hour)
-    observer.date = adjtime
-    astro_body.compute(observer)
-
-    base_x = deg_per_rad * float(astro_body.az)
-    base_y = deg_per_rad * float(astro_body.alt)
-
-    # 2. Перевод даты в условную фазу для вычисления пульсаций
-    t = float(ephem.date(date))
-
-    # Стоячая волна: годовое сжатие конденсатора (период — 365.25 дня)
-    wave_core = math.sin(t * 2 * math.pi / 365.25) * 5.0
-
-    # Высокочастотная модуляция: коронарный джет (12 гармоник)
-    wave_jet = math.sin(t * 2 * math.pi * 12.0) * math.cos(t * 2 * math.pi) * 2.0
-
-    # 3. Модификация координат (эффект шахматного разворота)
-    mod_x = base_x + wave_core
-    mod_y = base_y + wave_jet
-
-    return (mod_x, mod_y)
-
-def analemma_classic(date):
-    """
-    Классическая аналемма: уравнение времени (X) vs склонение (Y).
-
-    X — уравнение времени в градусах (±~5°)
-    Y — склонение в градусах (±~23.5° для Солнца)
-
-    Возвращает (eq_time_deg, declination_deg)
-    """
-    observer.date = ephem.date(date)
-    astro_body.compute(observer)
-
-    # Склонение (Y)
-    dec = deg_per_rad * float(astro_body.dec)
-
-    # Уравнение времени через прямое восхождение
-    # Среднее солнце: ra_mean = 280.460 + 0.9856474 * n (в градусах),
-    # где n — дни от J2000
-    # Но проще: eq_time = (среднее солнечное время) - (истинное солнечное время)
-    # Через ephem: разница между hour angle of mean sun и apparent sun
-
-    # Прямое восхождение Солнца (в градусах)
-    ra_sun = deg_per_rad * float(astro_body.ra)
-
-    # Среднее прямое восхождение (линейное по времени от J2000)
-    jd = ephem.date(date) + 15018.5  # дни от 2000/01/01
-    ra_mean = (280.460 + 0.9856474 * jd) % 360.0
-
-    # Уравнение времени (в градусах): разница между средним и истинным RA
-    eq_time = (ra_mean - ra_sun + 180) % 360 - 180
-
-    return (eq_time, dec)
-
-
 # ------------------------------------------------------------------------------
-# СБОР ДАННЫХ АНАЛЕММЫ ДЛЯ MATPLOTLIB
+# РАСЧЁТ Одной точки
 # ------------------------------------------------------------------------------
-def compute_analemma(year=None, hours=None, days=None,
-                     use_cable=False, above_horizon_only=True, classic=False):
-    """
-    Вычисляет массив точек аналеммы для построения графика в matplotlib.
-
-    Параметры:
-        year  — строка года (по умолчанию my_year)
-        hours — список часов [0..23] или None (использует includeH / show_allH)
-        days  — список дней [1..31] или None (использует includeD / show_allD)
-        use_cable — True: использовать analemma_xy_cable (с фазовыми поправками)
-                    False: использовать обычный analemma_xy
-        above_horizon_only — True: вернуть только точки над горизонтом (alt > 0)
-
-    Возвращает:
-        Список кортежей: [(hour, [(x, y), ...]), ...]
-        где hour — номер часа, x — азимут в градусах, y — высота в градусах.
-    """
-    global my_year
-    if year is not None:
-        my_year = str(year)
-
-    # Определение активных часов
-    if hours is not None:
-        active_hours = hours
-    elif show_allH:
-        active_hours = list(range(24))
-    else:
-        active_hours = [h for h in range(len(includeH)) if includeH[h] == 1]
-
-    # Определение активных дней
-    if days is not None:
-        active_days = days
-    elif show_allD:
-        active_days = list(range(1, 32))
-    else:
-        active_days = [d for d in range(1, len(includeD)) if includeD[d] == 1]
 
 
-    # Выбор функции расчёта
-#    calc_func = analemma_xy_cable if use_cable else analemma_xy
-    if classic:
-        calc_func = analemma_classic
-    else:
-        calc_func = analemma_xy_cable if use_cable else analemma_xy
-
-    # Сбор данных
-    result = []
-    for h in active_hours:
-        points = []
-        for m in range(1, 13):
-            for d in active_days:
-                if is_valid_date(int(my_year), m, d):
-# Без биений
-#                    date_str = '{0:s}/{1:d}/{2:d} {3:d}:00'.format(my_year, m, d, h)
-# Биения и завал фронтов
-                    hour_int = int(h)
-                    minute_int = int(round((h - hour_int) * 60))
-                    date_str = '{0:s}/{1:d}/{2:d} {3:d}:{4:02d}'.format(my_year, m, d, hour_int, minute_int)
-
-                    x, y = calc_func(date_str)
-                    if above_horizon_only and y <= 0:
-                        continue
-                    points.append((x, y))
-        if points:
-            result.append((h, points))
-
-    return result
-
-#def compute_analemma_for_time(dt, use_cable=False, classic=False):
 def compute_analemma_for_time(dt, use_cable=False):
     """
     Вычисляет одну точку аналеммы для заданного момента времени.
@@ -286,21 +150,128 @@ def compute_analemma_for_time(dt, use_cable=False):
     Возвращает:
         (azimuth, altitude) — координаты в градусах
     """
-    # Преобразование datetime в строку формата ephem
     date_str = dt.strftime('%Y/%m/%d %H:%M:%S')
-
-
-# Биения.
-#    hour_int = int(h)
-#    minute_int = int(round((h - hour_int) * 60))
-#    date_str = '{0:s}/{1:d}/{2:d} {3:d}:{4:02d}'.format(my_year, m, d, hour_int, minute_int)
+    return analemma_xy(date_str)
 
 
 
-#    if classic:
-#        return analemma_classic(date_str)
-#    el
-    if use_cable:
-        return analemma_xy_cable(date_str)
-    else:
-        return analemma_xy(date_str)
+# ------------------------------------------------------------------------------
+# Отрисовка графика
+# ------------------------------------------------------------------------------
+
+def drawAnalemma(planet_name, ax, year=None):
+    # --- Глобальные переменные из analemma_calc.py, необходимые для работы: ---
+    #   my_year       — строка текущего года
+    #   includeH      — массив из 25 элементов (0/1)
+    #   show_allH     — флаг (1 = все часы)
+    #   includeD      — массив из 32 элементов (0/1)
+    #   show_allD     — флаг (1 = все дни)
+    #   deg_per_rad   — коэффициент радианы → градусы
+    #   observer      — объект ephem.Observer
+    #   astro_str     — строка с названием тела
+    #   analemma_xy   — функция расчёта
+    #   is_valid_date — функция проверки даты
+    #   set_body      — функция выбора тела
+    #
+    # --- Из analemma_array.py: ---
+    #   PLANET_EPHEM_MAP — словарь русских → английских имён
+    #   analemma_state   — хранилище состояний окон
+    # ------------------------------------------------------------------------
+
+    global my_year
+
+    if year is not None:
+        my_year = str(year)
+
+    eng_name = PLANET_EPHEM_MAP.get(planet_name)
+    if eng_name is None:
+        return
+    set_body(eng_name)
+
+    if planet_name not in analemma_state:
+        analemma_state[planet_name] = {
+            'win':            ax.figure.canvas.get_tk_widget().winfo_toplevel(),
+            'fig':            ax.figure,
+            'ax':             ax,
+            'canvas':         ax.figure.canvas,
+            'hourly_data':    [None] * 25,
+            'cached_year':    -1,
+            'last_update_ms': 0,
+        }
+
+    state = analemma_state[planet_name]
+
+    # Сбор данных — как в оригинале: data[h] = [(x, y), ...]
+    data = []
+    for i in range(25):
+        data.append([])
+
+    for m in range(1, 13):
+        for d in range(1, len(includeD)):
+            if includeD[d] == 1 or show_allD == 1:
+                if is_valid_date(int(my_year), m, d):
+                    for h in range(len(includeH)):
+                        if includeH[h] == 1 or show_allH == 1:
+                            date = '{0:s}/{1:d}/{2:d} {3:d}:00'.format(my_year, m, d, h)
+                            data[h].append(analemma_xy(date))
+
+    # Сохраняем готовые кривые как списки кортежей [(x, y), ...] или None
+    for h in range(25):
+        if len(data[h]) > 0:
+            state['hourly_data'][h] = data[h]
+        else:
+            state['hourly_data'][h] = None
+
+    state['cached_year'] = int(my_year)
+
+    # Маркер — вычисляем один раз при открытии, дальше не трогаем
+    now = datetime.datetime.now()
+    state['marker_dt'] = now
+    state['marker_pos'] = analemma_xy(now.strftime('%Y/%m/%d %H:%M:%S'))
+
+
+    # Очистка графика
+    ax.clear()
+    ax.set_facecolor('#f8f9fa')
+
+    # Рисуем точки — как в оригинале: yellow если выше горизонта, blue если ниже
+    for h in range(len(includeH)):
+        if includeH[h] == 1 or show_allH == 1:
+            if state['hourly_data'][h] is None:
+                continue
+            for j in range(len(state['hourly_data'][h])):
+                x, y = state['hourly_data'][h][j]
+                if y > 0:
+                    ax.plot(x, y, 'o', markersize=1.5, color='gold', alpha=0.8)
+                else:
+                    ax.plot(x, y, 'o', markersize=1.5, color='blue', alpha=0.8)
+
+    # Сетка — как в оригинале
+    ax.axvline(90,  color='black', linewidth=1)
+    ax.axvline(180, color='black', linewidth=1)
+    ax.axvline(270, color='black', linewidth=1)
+    ax.axhline(45,  color='black', linewidth=1)
+    ax.axhline(0,   color='black', linewidth=2)
+    ax.axhline(-45, color='black', linewidth=1)
+
+    # Диапазоны
+    ax.set_xlim(0, 360)
+    ax.set_ylim(-90, 90)
+    ax.set_xticks([0, 90, 180, 270, 360])
+    ax.set_yticks([-90, -45, 0, 45, 90])
+
+    # Подписи — как в оригинале
+    mylon = deg_per_rad * float(observer.lon)
+    mylat = deg_per_rad * float(observer.lat)
+    my_ns = "N" if mylat > 0 else "S"
+    my_we = "W" if mylon < 0 else "E"
+    mytitle = "{0:s} Analemma Plot for  {1:.3f}{2:s}  {3:.3f}{4:s}".format(
+        my_year, abs(mylat), my_ns, abs(mylon), my_we
+    )
+    xDesc = "Direction [N=0, E=90, S=180, W=270] [Yellow = {0:s} above horizon, Blue = {0:s} below horizon]".format(astro_str)
+
+    ax.set_title(mytitle, fontsize=10)
+    ax.set_xlabel(xDesc)
+    ax.set_ylabel("Elevation")
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('auto')
