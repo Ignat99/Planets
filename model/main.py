@@ -29,8 +29,6 @@ import planet4
 from analemma_calc import (
     set_observer,
     set_body,
-    compute_analemma,
-    compute_analemma_for_time,
     BODY_MAP,
     deg_per_rad,
 )
@@ -44,19 +42,11 @@ from analemma_main import (
 )
 # analemma_main.root = root
 
+from analemma_array import (
+    PLANET_EPHEM_MAP,
+    analemma_state
+)
 
-# Соответствие русских названий планет и имён в ephem.
-PLANET_EPHEM_MAP = {
-    "Солнце":   "Sun",
-    "Меркурий": "Mercury",
-    "Венера":   "Venus",
-    "Земля":    "Sun",
-    "Луна":     "Moon",
-    "Марс":     "Mars",
-    "Юпитер":   "Jupiter",
-    "Сатурн":   "Saturn",
-    "Хирон":    "Chiron",
-}
 
 anim_window = None
 anim_obj = None
