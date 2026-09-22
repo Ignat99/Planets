@@ -2,7 +2,7 @@
 # ИНТЕГРАЦИЯ АНАЛЕММЫ В main.py
 # Добавить после импортов, до создания главного окна
 # ==============================================================================
-
+import calendar
 import ephem
 import tkinter as tk
 import numpy as np          # <-- добавить
@@ -10,35 +10,84 @@ import numpy as np          # <-- добавить
 #from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from analemma_calc import (
-    set_observer, set_body, compute_analemma,
-    compute_analemma_for_time, BODY_MAP
+    set_observer, set_body, 
+    analemma_xy, drawAnalemma,
+    compute_analemma_for_time,
+    BODY_MAP
 )
 import datetime
 
 # Наблюдатель по умолчанию — Малага (Андалусия, Испания)
 set_observer(36.7213, -4.4214, "Malaga")
 
-# Соответствие русских названий планет и имён в ephem.
-# «Земля» показывает аналемму Солнца, видимую с Земли.
-PLANET_EPHEM_MAP = {
-    "Солнце":   "Sun",
-    "Меркурий": "Mercury",
-    "Венера":   "Venus",
-    "Земля":    "Sun",
-    "Луна":     "Moon",
-    "Марс":     "Mars",
-    "Юпитер":   "Jupiter",
-    "Сатурн":   "Saturn",
-    "Хирон":    None,   # Требует добавления ephem.Chiron() в BODY_MAP
-}
 
-# Хранилище состояний открытых окон аналемм
-analemma_state = {}
+
+from analemma_array import (
+    PLANET_EPHEM_MAP,
+    analemma_state
+)
+
+
 real_time_timer_id = None       # ID таймера реального времени
 analemma_throttle_ms = 100      # минимальный интервал обновления (мс)
 #simulated_hour = None    # «обучающий» час для кривой — растёт на 1 каждую секунду
 simulated_time = None    # дробный час (например, 20.85 = 20:51)
 
+
+# ------------------------------------------------------------------------------
+# Нарисовать график аналемму
+# ------------------------------------------------------------------------------
+
+
+
+
+# ------------------------------------------------------------------------------
+# Посчитать 24 аналеммы
+# ------------------------------------------------------------------------------
+def initial_analemma_plot(planet_name, dt, curve_hour=None):
+    if planet_name not in analemma_state:
+        return
+    state = analemma_state[planet_name]
+    if not state['win'].winfo_exists():
+        return
+
+    now_ms = int(datetime.datetime.now().timestamp() * 1000)
+    if now_ms - state['last_update_ms'] < analemma_throttle_ms:
+        return
+    state['last_update_ms'] = now_ms
+
+    eng_name = PLANET_EPHEM_MAP.get(planet_name)
+    if eng_name is None:
+        return
+    set_body(eng_name)
+
+    # 1. Загрузка всех 24 кривых (если год сменился или кэш пуст)
+    if state['all_hourly_curves'] is None or state['cached_year'] != dt.year:
+        # Используем функцию для единоразового подсчтека 24 аналемм. 
+        # Она вернет список: [(0, points), (1, points), ..., (23, points)]
+        hourly_data = compute_hourly_analemmas(
+            year=dt.year,
+            days=list(range(1, 32)),
+            use_cable=False,
+            above_horizon_only=False
+        )
+
+        curves_map = {}
+
+
+        for h, points in hourly_data:
+            if not points:
+                continue
+        
+            xs = np.array([p[0] for p in points], dtype=float)
+            ys = np.array([p[1] for p in points], dtype=float)
+
+            curves_map[h] = (ys, xs)
+        
+        # Заполняем пропуски (если для какого-то часа точек нет, копируем соседний или оставляем None)
+        state['hourly_data'] = [curves_map.get(h, None) for h in range(24)]
+        state['cached_year'] = dt.year
+        return state['hourly_data']
 
 
 # ------------------------------------------------------------------------------
@@ -65,83 +114,101 @@ def update_analemma_plot(planet_name, dt, curve_hour=None):
     ax.clear()
     ax.set_facecolor('#f8f9fa')
 
-    effective_hour = curve_hour if curve_hour is not None else dt.hour
+    # 1. Загрузка всех 24 кривых (если год сменился или кэш пуст)
+#    if state['all_hourly_curves'] is None or state['cached_year'] != dt.year:
 
-    # 1. Пересчёт кривой при смене часа или года
-    if state['cached_hour'] != effective_hour or state['cached_year'] != dt.year:
-        full_data = compute_analemma(
-            year=dt.year,
-            hours=[effective_hour],
-            days=list(range(1, 32)),
-            use_cable=True,
-            above_horizon_only=False
-        )
-        if full_data:
-            for _, points in full_data:
-                if points:
-                    xs = np.array([p[0] for p in points])
-                    ys = np.array([p[1] for p in points])
-                    # Unwrap азимута — убирает скачки на 0°/360°
-                    xs = np.degrees(np.unwrap(np.radians(xs)))
-                    state['cached_curve'] = (xs, ys)
-        else:
-            state['cached_curve'] = None
-        state['cached_hour'] = effective_hour
-        state['cached_year'] = dt.year
+#    if state['hourly_data'] is None or state['cached_year'] != dt.year:
+        # Используем вашу новую функцию! Она вернет список: [(0, points), (1, points), ..., (23, points)]
+#        all_hourly_curves = state['hourly_data']
+#        hourly_data =  state['hourly_data']
+#        curves_map = {}
 
-    # 2. Отрисовка кэшированной кривой
-    if state['cached_curve'] is not None:
-        xs, ys = state['cached_curve']
+
+#        for h, points in hourly_data:
+ #           if not points:
+  #              continue
+        
+        # Преобразуем в удобный список индексов 0..23
+        # Структура all_hourly_data: [(hour_int, [(x,y),...]), ...]
+   #         xs = np.array([p[0] for p in points], dtype=float)
+    #        ys = np.array([p[1] for p in points], dtype=float)
+
+                # Unwrap азимута
+                # Убираем скачок азимута через 0°/360°
+#            xs = np.degrees(np.unwrap(np.radians(xs)))
+#            curves_map[h] = (xs, ys)
+        
+        # Заполняем пропуски (если для какого-то часа точек нет, копируем соседний или оставляем None)
+ #       state['hourly_data'] = [curves_map.get(h, None) for h in range(24)]
+  #      state['cached_year'] = dt.year
+
+
+    # 2. Определяем, какую кривую рисовать
+    # Если передан конкретный час (для анимации) — берем его. Иначе — текущий реальный час.
+    target_hour = int(curve_hour) if curve_hour is not None else dt.hour
+    target_hour = target_hour % 24  # защита от переполнения
+
+    current_curve = state['hourly_data'][target_hour]
+
+    # 3. Отрисовка кривой
+    if current_curve is not None:
+#        xs, ys = current_curve
+        xs = [p[0] for p in current_curve]
+        ys = [p[1] for p in current_curve]
         ax.plot(xs, ys, color='#4a90d9', alpha=0.5, linewidth=1.2)
-
-    # 3. Маркер — по реальному времени
-    cur_x, cur_y = compute_analemma_for_time(dt, use_cable=True)
-
-    # Unwrap для маркера — найти ближайший развёрнутый аналог
-    if state['cached_curve'] is not None:
-        xs_cached = state['cached_curve'][0]
-        if len(xs_cached) > 0:
-            # Подбираем представление cur_x, ближайшее к медиане кривой
-            ref = np.median(xs_cached)
-            cur_x = ref + ((cur_x - ref + 180) % 360) - 180
-
-    if cur_y > 0:
-        ax.plot(cur_x, cur_y, 'ro', markersize=8, zorder=5)
-        ax.annotate(
-            dt.strftime('%d.%m %H:%M'),
-            xy=(cur_x, cur_y),
-            xytext=(8, 8),
-            textcoords='offset points',
-            fontsize=8, color='red', fontweight='bold'
-        )
     else:
-        ax.plot(cur_x, cur_y, 'bx', markersize=8, zorder=5)
+        # Если для этого часа нет данных (например, Солнце не восходило), можно нарисовать пустую рамку
+        pass
 
-    # 4. Оформление
-    hour_label = f"наблюдение: {int(simulated_time):02d}:{int(round((simulated_time % 1) * 60)):02d}"
+
+    # 4. Маркер — зафиксированная позиция из state
+    if 'marker_pos' in state and state['marker_pos'] is not None:
+        cur_x, cur_y = state['marker_pos']
+        marker_dt = state.get('marker_dt', dt)
+
+        if cur_y > 0:
+            ax.plot(cur_x, cur_y, 'ro', markersize=8, zorder=5)
+            ax.annotate(
+                marker_dt.strftime('%d.%m %H:%M'),
+                xy=(cur_x, cur_y),
+                xytext=(8, 8),
+                textcoords='offset points',
+                fontsize=8, color='red', fontweight='bold'
+            )
+        else:
+            ax.plot(cur_x, cur_y, 'bx', markersize=8, zorder=5)
+
+
+    # 5. Оформление
+    # Показываем, какая именно "часовая аналемма" сейчас активна
+    display_hour = int(curve_hour) if curve_hour is not None else dt.hour
+    hour_label = f"активная кривая: {display_hour:02d}:00"
 
     ax.set_title(
         f"Аналемма — {planet_name}\n{dt.strftime('%d.%m.%Y %H:%M:%S')}  |  {hour_label}",
         fontsize=9
     )
 
+    ax.set_xlim(0, 360)
+    ax.set_ylim(-90, 90)
+
     ax.set_xlabel("Азимут, °")
     ax.set_ylabel("Высота, °")
 
-    ax.relim()
-    ax.autoscale_view()
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    ax.set_xlim(xlim[0] - (xlim[1] - xlim[0]) * 0.1, xlim[1] + (xlim[1] - xlim[0]) * 0.1)
-    ax.set_ylim(ylim[0] - (ylim[1] - ylim[0]) * 0.1, ylim[1] + (ylim[1] - ylim[0]) * 0.1)
+
+    ax.set_xticks([0, 90, 180, 270, 360])
+    ax.set_yticks([-90, -45, 0, 45, 90])
+
+    ax.axvline(180, color="black", linewidth=1)
+    ax.axhline(0, color="black", linewidth=2)
+    ax.axhline(45, color="black", linewidth=1)
+    ax.axhline(-45, color="black", linewidth=1)
+
 
     ax.grid(True, alpha=0.3)
     ax.set_aspect('auto')
 
     state['canvas'].draw()
-
-
-
 
 # ------------------------------------------------------------------------------
 # СОЗДАНИЕ ОКНА АНАЛЕММЫ
@@ -178,6 +245,26 @@ def open_analemma(planet_name):
     fig.tight_layout()
 
     canvas = FigureCanvasTkAgg(fig, master=win)
+
+    analemma_state[planet_name] = {
+        'win':            win,
+        'fig':            fig,
+        'ax':             ax,
+        'canvas':         canvas,
+        'cached_curve':   None,
+        'all_hourly_curves': None,   # <-- Сюда сохраним 24 кривые сразу
+        'hourly_data': [None] * 25,
+        'cached_hour':    -1,
+        'cached_year':    -1,
+        'last_update_ms': 0,
+    }
+
+    drawAnalemma(
+        planet_name,
+        ax,
+        year=datetime.datetime.now().year
+    )
+
     canvas.draw()
     canvas.get_tk_widget().pack(fill="both", expand=True)
 
@@ -189,64 +276,44 @@ def open_analemma(planet_name):
 
     win.protocol("WM_DELETE_WINDOW", _on_close)
 
-    analemma_state[planet_name] = {
-        'win':            win,
-        'fig':            fig,
-        'ax':             ax,
-        'canvas':         canvas,
-        'cached_curve':   None,
-        'cached_hour':    -1,
-        'cached_year':    -1,
-        'last_update_ms': 0,
-    }
+
 
     # Первичная отрисовка — текущее системное время
-    update_analemma_plot(planet_name, datetime.datetime.now())
+#    analemma_state[planet_name]['all_hourly_curves'] = initial_analemma_plot(planet_name, datetime.datetime.now())
 
 
 # ------------------------------------------------------------------------------
 # ТАЙМЕР РЕАЛЬНОГО ВРЕМЕНИ (пауза / анимация не запущена)
 # ------------------------------------------------------------------------------
-def start_real_time_analemma1():
-    global real_time_timer_id, simulated_hour
-    now = datetime.datetime.now()
-
-    # Инициализация обучающего часа — текущий реальный час
-    if simulated_hour is None:
-        simulated_hour = now.hour
-
-    for pname in list(analemma_state.keys()):
-        update_analemma_plot(pname, now, curve_hour=simulated_hour)
-
-    # Сдвигаем час на +1 для следующего тика (цикл 0..23)
-    simulated_hour = (simulated_hour + 1) % 24
-
-    real_time_timer_id = root.after(1000, start_real_time_analemma)
-
 def start_real_time_analemma():
     global real_time_timer_id, simulated_time
-    now = datetime.datetime.now()
 
+    # Фиксируем время старта один раз — маркер и дата не будут двигаться
     if simulated_time is None:
-        # Инициализация от текущего реального времени (с минутами и секундами)
-        simulated_time = now.hour + now.minute / 60.0 + now.second / 3600.0
+        simulated_time = datetime.datetime.now().hour
+
+    # Используем одно и то же зафиксированное время для всех тиков
+    if not hasattr(start_real_time_analemma, 'fixed_dt'):
+        start_real_time_analemma.fixed_dt = datetime.datetime.now()
+
+    fixed_dt = start_real_time_analemma.fixed_dt
 
     for pname in list(analemma_state.keys()):
-        update_analemma_plot(pname, now, curve_hour=simulated_time)
+        update_analemma_plot(pname, fixed_dt, curve_hour=simulated_time)
 
-    # Шаг: 1 час + 1 минута = 61/60 часа
-    # 24*60 / 61 ≈ 23.6 — НЕ кратно, поэтому возникает биение
-    simulated_time = (simulated_time + 61.0 / 60.0) % 24
+    simulated_time = (simulated_time + 1) % 24
 
     real_time_timer_id = root.after(1000, start_real_time_analemma)
 
 
 def stop_real_time_analemma():
-    """Останавливает таймер реального времени."""
     global real_time_timer_id
     if real_time_timer_id is not None:
         root.after_cancel(real_time_timer_id)
         real_time_timer_id = None
+    # Сбрасываем зафиксированное время, чтобы при следующем запуске взять новое
+    if hasattr(start_real_time_analemma, 'fixed_dt'):
+        del start_real_time_analemma.fixed_dt
 
 
 # ==============================================================================
@@ -324,16 +391,6 @@ PLANET_EPHEM_MAP = {
 }
 
 
-# ==============================================================================
-# ШАГ 7. ПРИВЯЗКА ВСЕХ КНОПОК ПЛАНЕТ К ФУНКЦИИ ОТКРЫТИЯ ОКНА
-# ==============================================================================
-# Добавить сразу после цикла создания кнопок planet_buttons:
-
-# Перенесено в main
-#for name in planet_buttons:
-#    planet_buttons[name].config(
-#        command=lambda n=name: open_analemma(n)
-#    )
 
 
 # ==============================================================================
