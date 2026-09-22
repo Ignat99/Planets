@@ -21,3 +21,7 @@ PLANET_EPHEM_MAP = {
     "Сатурн":   "Saturn",
     "Хирон":    None,   # Требует добавления ephem.Chiron() в BODY_MAP
 }
+
+
+CONTRAST_LEVELS = [0.15, 0.40, 0.90, 0.40, 0.15]
+show_five_curves = True   # True — 5 кривых, False — 1 кривая
