@@ -23,7 +23,8 @@ from analemma_array import (
     PLANET_EPHEM_MAP,
     analemma_state,
     CONTRAST_LEVELS,
-    show_five_curves
+    show_five_curves,
+    show_lines
 )
 
 
@@ -77,33 +78,7 @@ def update_analemma_plot(planet_name, dt, curve_hour=None):
 
         curve = state['hourly_data'][h]
         if curve is not None:
-            xs = [p[0] for p in curve]
-            ys = [p[1] for p in curve]
-
-            xs_above, ys_above = [], []
-            xs_below, ys_below = [], []
-            for x, y in zip(xs, ys):
-                if y > 0:
-                    if xs_below:
-                        ax.plot(xs_below, ys_below, '-', color='blue',
-                                alpha=contrast, linewidth=1.5)
-                        xs_below, ys_below = [], []
-                    xs_above.append(x)
-                    ys_above.append(y)
-                else:
-                    if xs_above:
-                        ax.plot(xs_above, ys_above, '-', color='gold',
-                                alpha=contrast, linewidth=1.5)
-                        xs_above, ys_above = [], []
-                    xs_below.append(x)
-                    ys_below.append(y)
-
-            if xs_above:
-                ax.plot(xs_above, ys_above, '-', color='gold',
-                        alpha=contrast, linewidth=1.5)
-            if xs_below:
-                ax.plot(xs_below, ys_below, '-', color='blue',
-                        alpha=contrast, linewidth=1.5)
+            _draw_curve_on_ax(ax, curve, contrast)
 
     # Маркер
     if 'marker_pos' in state and state['marker_pos'] is not None:
@@ -136,11 +111,13 @@ def update_analemma_plot(planet_name, dt, curve_hour=None):
     ax.grid(True, alpha=0.3)
     ax.set_aspect('auto')
 
-    mode_label = "5 кривых" if show_five_curves else "1 кривая"
+    curve_label = "5 кривых" if show_five_curves else "1 кривая"
+    render_label = "линии" if show_lines else "точки"
     ax.set_title(
-        f"Аналемма — {planet_name}\n{dt.strftime('%d.%m.%Y %H:%M:%S')}  |  {center_hour:02d}:00  |  {mode_label}",
+        f"Аналемма — {planet_name}\n{dt.strftime('%d.%m.%Y %H:%M:%S')}  |  {center_hour:02d}:00  |  {curve_label}  |  {render_label}",
         fontsize=9
     )
+
 
     state['canvas'].draw()
 
@@ -153,15 +130,63 @@ def update_analemma_plot(planet_name, dt, curve_hour=None):
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+
+def _get_current_hour():
+    """Возвращает текущий час — из симуляции или системного времени."""
+    return simulated_time if simulated_time is not None else datetime.datetime.now().hour
+
+
+def _draw_curve_on_ax(ax, curve, contrast):
+    """Рисует одну кривую на оси — линиями или точками, в зависимости от show_lines."""
+    if show_lines:
+        xs = [p[0] for p in curve]
+        ys = [p[1] for p in curve]
+
+        xs_above, ys_above = [], []
+        xs_below, ys_below = [], []
+        for x, y in zip(xs, ys):
+            if y > 0:
+                if xs_below:
+                    ax.plot(xs_below, ys_below, '-', color='blue',
+                            alpha=contrast, linewidth=1.5)
+                    xs_below, ys_below = [], []
+                xs_above.append(x)
+                ys_above.append(y)
+            else:
+                if xs_above:
+                    ax.plot(xs_above, ys_above, '-', color='gold',
+                            alpha=contrast, linewidth=1.5)
+                    xs_above, ys_above = [], []
+                xs_below.append(x)
+                ys_below.append(y)
+
+        if xs_above:
+            ax.plot(xs_above, ys_above, '-', color='gold',
+                    alpha=contrast, linewidth=1.5)
+        if xs_below:
+            ax.plot(xs_below, ys_below, '-', color='blue',
+                    alpha=contrast, linewidth=1.5)
+    else:
+        for x, y in curve:
+            if y > 0:
+                ax.plot(x, y, 'o', markersize=2, color='gold', alpha=contrast)
+            else:
+                ax.plot(x, y, 'o', markersize=2, color='blue', alpha=contrast)
+
+
 def toggle_curves(planet_name):
     global show_five_curves
     show_five_curves = not show_five_curves
-    update_analemma_plot(
-        planet_name,
-        datetime.datetime.now(),
-        curve_hour=simulated_time if simulated_time is not None
-                       else datetime.datetime.now().hour
-    )
+    update_analemma_plot(planet_name, datetime.datetime.now(),
+                         curve_hour=_get_current_hour())
+
+
+def toggle_render_mode(planet_name):
+    global show_lines
+    show_lines = not show_lines
+    update_analemma_plot(planet_name, datetime.datetime.now(),
+                         curve_hour=_get_current_hour())
+
 
 
 def open_analemma(planet_name):
@@ -204,12 +229,22 @@ def open_analemma(planet_name):
         year=datetime.datetime.now().year
     )
 
-    # Кнопка размещается снизу, canvas — сверху
+    # Кнопки в одну строку: слева — 1/5 кривых, справа — линии/точки
+    btn_frame = tk.Frame(win)
+    btn_frame.pack(side="bottom", pady=6)
 #    btn_toggle = tk.Button(win, text="1 / 5 кривых", command=toggle_curves)
-    btn_toggle = tk.Button(win, text="1 / 5 кривых",
+
+#----
+    btn_toggle = tk.Button(btn_frame, text="1 / 5 кривых",
                            command=lambda: toggle_curves(planet_name))
 
-    btn_toggle.pack(side="bottom", pady=4)
+    btn_toggle.pack(side="left", padx=8)
+
+
+    btn_render = tk.Button(btn_frame, text="линии / точки",
+                           command=lambda: toggle_render_mode(planet_name))
+    btn_render.pack(side="right", padx=8)
+
 
 #    canvas.draw()
 #    canvas.get_tk_widget().pack(fill="both", expand=True)
