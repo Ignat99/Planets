@@ -99,8 +99,10 @@ def set_observer(lat_deg, lon_deg, name="Custom"):
     """
     global observer
     observer.name = name
-    observer.lat = str(lat_deg / deg_per_rad)
-    observer.lon = str(lon_deg / deg_per_rad)
+#    observer.lat = str(lat_deg / deg_per_rad)
+#    observer.lon = str(lon_deg / deg_per_rad)
+    observer.lat = str(lat_deg)
+    observer.lon = str(lon_deg)
 
 def set_body(body_name):
     """
