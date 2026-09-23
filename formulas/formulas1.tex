@@ -1,0 +1,59 @@
+
+\documentclass[10pt,fleqn]{report}
+\usepackage[vcentering]{geometry}
+\geometry{papersize={6in,7in},total={5in,6in}}
+
+\pagestyle{empty}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsbsy}
+\usepackage{tensor}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{bm}
+\usepackage{breqn}
+\definecolor{gray}{rgb}{0.95,0.95,0.95}
+\setlength{\parindent}{0pt}
+\DeclareMathOperator{\Tr}{Tr}
+\DeclareMathOperator{\Adj}{Adj}
+\newcommand{\bfrac}[2]{\displaystyle\frac{#1}{#2}}
+\newcommand{\lp}{\left (}
+\newcommand{\rp}{\right )}
+\newcommand{\paren}[1]{\lp {#1} \rp}
+\newcommand{\half}{\frac{1}{2}}
+\newcommand{\llt}{\left <}
+\newcommand{\rgt}{\right >}
+\newcommand{\abs}[1]{\left |{#1}\right | }
+\newcommand{\pdiff}[2]{\bfrac{\partial {#1}}{\partial {#2}}}
+\newcommand{\lbrc}{\left \{}
+\newcommand{\rbrc}{\right \}}
+\newcommand{\W}{\wedge}
+\newcommand{\prm}[1]{{#1}'}
+\newcommand{\ddt}[1]{\bfrac{d{#1}}{dt}}
+\newcommand{\R}{\dagger}
+\newcommand{\deriv}[3]{\bfrac{d^{#3}#1}{d{#2}^{#3}}}
+\newcommand{\grade}[1]{\left < {#1} \right >}
+\newcommand{\f}[2]{{#1}\lp{#2}\rp}
+\newcommand{\eval}[2]{\left . {#1} \right |_{#2}}
+\newcommand{\Nabla}{\boldsymbol{\nabla}}
+\newcommand{\eb}{\boldsymbol{e}}
+\usepackage{float}
+\floatstyle{plain} % optionally change the style of the new float
+\newfloat{Code}{H}{myc}
+\lstloadlanguages{Python}
+
+\begin{document}
+\begin{equation*} r = \alpha  x + \beta  y + \gamma  z \end{equation*}
+\begin{equation*} \alpha^{2} + \beta^{2} + \gamma^{2} =  G^{2} \end{equation*}
+\begin{equation*} \Psi = e^{- i \left(\alpha x + \beta y + \gamma z\right)} e^{i \omega t} \end{equation*}
+\begin{equation*} d \Psi / dx = - i \Psi \alpha \end{equation*}
+\begin{equation*} d \Psi / dy = - i \Psi \beta \end{equation*}
+\begin{equation*} d \Psi / dz = - i \Psi \gamma \end{equation*}
+\begin{equation*} Z4 = [-sqrt(epsilon*epsilon_z*mu/(-epsilon*cos(theta)**2 + epsilon + epsilon_z*cos(theta)**2))*Abs(omega), sqrt(epsilon*epsilon_z*mu/(-epsilon*cos(theta)**2 + epsilon + epsilon_z*cos(theta)**2))*Abs(omega), -sqrt(epsilon*mu*mu_z/(-mu*cos(theta)**2 + mu + mu_z*cos(theta)**2))*Abs(omega), sqrt(epsilon*mu*mu_z/(-mu*cos(theta)**2 + mu + mu_z*cos(theta)**2))*Abs(omega)] \end{equation*}
+\begin{equation*} E = \bm{E\gamma_{t}} = - E^{x}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{x} - E^{y}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{y} - E^{z}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{z} \end{equation*}
+\begin{equation*} H = \bm{H\gamma_{t}} = - H^{x}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{x} - H^{y}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{y} - H^{z}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{z} \end{equation*}
+\begin{equation*} F = E+IH = - E^{x}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{x} - E^{y}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{y} - E^{z}  \boldsymbol{\gamma }_{t}\wedge \boldsymbol{\gamma }_{z} - H^{z}  \boldsymbol{\gamma }_{x}\wedge \boldsymbol{\gamma }_{y} + H^{y}  \boldsymbol{\gamma }_{x}\wedge \boldsymbol{\gamma }_{z} - H^{x}  \boldsymbol{\gamma }_{y}\wedge \boldsymbol{\gamma }_{z} \end{equation*}
+\end{document}
