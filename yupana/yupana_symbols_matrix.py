@@ -11,38 +11,79 @@ class YupanaSymbolMatrix:
     def _load_data(self):
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Файл {self.json_path} не найден.")
-        
-        with open(self.json_path, 'r', encoding='utf-8') as f:
+
+        with open(self.json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         cocycles = data.get("cocycles", {})
-        
-        # Пример привязки. В реальном проекте эти координаты должны быть в JSON.
-        # Сейчас хардкодим для демонстрации: (row, col) -> (cokey, cell_id)
-        # cokey = "2_Lightostatics", cell_id = "913"
-        self.default_mapping[(0, 1)] = ("2_Lightostatics", "913")
-        self.default_mapping[(1, 0)] = ("2_Lightostatics", "911")
-        
-        print("Базовая матрица символов инициализирована.")
+
+        # Двухпроходная стратегия: сначала размещаем ключи 9XX (основные символы),
+        # затем — однозначные ключи (3, 5, 7, 9) только в свободные позиции.
+        for pass_num in range(2):
+            for cokey, cocycle in cocycles.items():
+                # Извлекаем номер из ключа коцикла: "2_Lightostatics" -> 2
+                parts = cokey.split("_")
+                try:
+                    level_num = int(parts[0])
+                except ValueError:
+                    continue
+
+                # Пропускаем коциклы с level < 2 (Инфостатика "0_4")
+                if level_num < 2:
+                    continue
+
+                row = level_num - 2  # 2->0, 3->1, 4->2, 5->3, 6->4, 7->5
+
+                cells = cocycle.get("cells", {})
+                for cell_id, cell_data in cells.items():
+                    symbol = cell_data.get("symbol", "")
+                    if not symbol:
+                        continue
+                    if cell_id == "0":
+                        continue  # масштаб — пропускаем
+
+                    is_9xx = cell_id.startswith("9") and len(cell_id) > 1
+
+                    # Проход 0: только 9XX; проход 1: только остальные
+                    if pass_num == 0 and not is_9xx:
+                        continue
+                    if pass_num == 1 and is_9xx:
+                        continue
+
+                    # Вычисляем столбец
+                    if is_9xx:
+                        try:
+                            n = int(cell_id[-2:])
+                            col = (n - 11) // 2
+                        except ValueError:
+                            continue
+                    else:
+                        try:
+                            n = int(cell_id)
+                            col = (n - 1) // 2
+                        except ValueError:
+                            continue
+
+                    if 0 <= col <= 8:
+                        key = (row, col)
+                        # В проходе 0 (9XX) — перезаписываем.
+                        # В проходе 1 (остальные) — только если свободно.
+                        if pass_num == 0 or key not in self.default_mapping:
+                            self.default_mapping[key] = (cokey, cell_id)
+
+        print(f"Базовая матрица символов инициализирована. Размещено: {len(self.default_mapping)}")
 
     def set_offset(self, row_shift, col_shift):
         self.offset = (row_shift, col_shift)
 
     def get_symbol_info(self, yupana_row, yupana_col):
-        """
-        Возвращает кортеж (cokey, cell_id) для данной клетки с учетом сдвига.
-        Если символа нет, возвращает None.
-        """
+        """Возвращает (cokey, cell_id) для клетки с учётом сдвига, или None."""
         base_r = yupana_row - self.offset[0]
         base_c = yupana_col - self.offset[1]
         return self.default_mapping.get((base_r, base_c))
 
     def get_filename_for_symbol(self, yupana_row, yupana_col):
-        """
-        Генерирует имя файла строго по твоему шаблону:
-        {cokey}__{cell_id}.jpg
-        Пример: 2_Lightostatics__913.jpg
-        """
+        """Возвращает имя файла вида '2_Lightostatics__913.jpg' или None."""
         info = self.get_symbol_info(yupana_row, yupana_col)
         if info:
             cokey, cell_id = info
@@ -55,8 +96,9 @@ class YupanaSymbolMatrix:
             target_r = r + self.offset[0]
             target_c = c + self.offset[1]
             if 0 <= target_r < rows and 0 <= target_c < cols:
-                matrix[target_r][target_c] = (cokey, cell_id) # Храним пару, а не просто ID
+                matrix[target_r][target_c] = (cokey, cell_id)
         return matrix
+
 
 # --- Пример использования (можно вставить в yupana_emulator.py) ---
 
