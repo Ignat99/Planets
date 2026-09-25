@@ -4,13 +4,11 @@ import os
 class YupanaSymbolMatrix:
     def __init__(self, json_path="receptacle.json"):
         self.json_path = json_path
-        self.symbol_map = {}  # { "913": "T", "911": "l1", ... } - для справки
-        self.default_mapping = {} # { (row, col): symbol_number }
-        self.offset = (0, 0) # (row_shift, col_shift)
+        self.default_mapping = {}  # { (row, col): (cokey, cell_id) }
+        self.offset = (0, 0)
         self._load_data()
 
     def _load_data(self):
-        """Загружает receptacle.json и строит базовую карту соответствий."""
         if not os.path.exists(self.json_path):
             raise FileNotFoundError(f"Файл {self.json_path} не найден.")
         
@@ -19,57 +17,45 @@ class YupanaSymbolMatrix:
 
         cocycles = data.get("cocycles", {})
         
-        # Заполняем default_mapping на основе описания задачи
-        # Примечание: В реальном JSON ключи ячеек - это строки ("0", "913" и т.д.).
-        # Нам нужно сопоставить их с координатами матрицы Юпаны.
-        # Поскольку в JSON нет явных координат (row, col), мы используем эвристику 
-        # или предполагаем, что ключи ячеек соответствуют номерам символов.
+        # Пример привязки. В реальном проекте эти координаты должны быть в JSON.
+        # Сейчас хардкодим для демонстрации: (row, col) -> (cokey, cell_id)
+        # cokey = "2_Lightostatics", cell_id = "913"
+        self.default_mapping[(0, 1)] = ("2_Lightostatics", "913")
+        self.default_mapping[(1, 0)] = ("2_Lightostatics", "911")
         
-        # Для примера реализации "по умолчанию" из вашего ТЗ:
-        # Мы вручную зададим базовые точки, так как в JSON нет полей row/col.
-        # В реальном проекте эти координаты должны быть в JSON или вычисляться алгоритмом.
-        
-        self.default_mapping[(0, 1)] = "913"  # T (время)
-        self.default_mapping[(1, 0)] = "911"  # l1
-        
-        # Если в JSON есть другие явные связи, их можно добавить сюда.
-        # Сейчас мы просто возвращаем эту структуру, которую можно расширить.
         print("Базовая матрица символов инициализирована.")
-        print("Точки привязки по умолчанию: (0,1)->913, (1,0)->911")
 
     def set_offset(self, row_shift, col_shift):
-        """Устанавливает глобальный сдвиг для всей матрицы символов."""
         self.offset = (row_shift, col_shift)
-        print(f"Сдвиг установлен: row+={row_shift}, col+={col_shift}")
 
-    def get_symbol_at(self, yupana_row, yupana_col):
+    def get_symbol_info(self, yupana_row, yupana_col):
         """
-        Возвращает номер символа для данной клетки Юпаны с учетом сдвига.
+        Возвращает кортеж (cokey, cell_id) для данной клетки с учетом сдвига.
         Если символа нет, возвращает None.
         """
-        # Вычисляем "реальную" позицию в базовой карте
         base_r = yupana_row - self.offset[0]
         base_c = yupana_col - self.offset[1]
-        
-        key = (base_r, base_c)
-        return self.default_mapping.get(key)
+        return self.default_mapping.get((base_r, base_c))
+
+    def get_filename_for_symbol(self, yupana_row, yupana_col):
+        """
+        Генерирует имя файла строго по твоему шаблону:
+        {cokey}__{cell_id}.jpg
+        Пример: 2_Lightostatics__913.jpg
+        """
+        info = self.get_symbol_info(yupana_row, yupana_col)
+        if info:
+            cokey, cell_id = info
+            return f"{cokey}__{cell_id}.jpg"
+        return None
 
     def generate_full_matrix(self, rows, cols):
-        """
-        Генерирует полную матрицу (список списков) номеров символов для размера Юпаны.
-        Пустые клетки заполняются None.
-        """
         matrix = [[None for _ in range(cols)] for _ in range(rows)]
-        
-        for (r, c), symbol_id in self.default_mapping.items():
-            # Применяем сдвиг
+        for (r, c), (cokey, cell_id) in self.default_mapping.items():
             target_r = r + self.offset[0]
             target_c = c + self.offset[1]
-            
-            # Проверка границ
             if 0 <= target_r < rows and 0 <= target_c < cols:
-                matrix[target_r][target_c] = symbol_id
-                
+                matrix[target_r][target_c] = (cokey, cell_id) # Храним пару, а не просто ID
         return matrix
 
 # --- Пример использования (можно вставить в yupana_emulator.py) ---
