@@ -10,11 +10,24 @@ import json
 import os
 
 
+
+
 class YupanaSymbolMatrix:
     # Смещения колонок вдоль диагонали от стартовой колонки:
     # шаг 0 → +0, шаг 1 → +3, шаг 2 → +5, шаг 3 → +6, шаг 4 → +7
 #    DIAGONAL_COL_OFFSETS = [0, 3, 5, 6, 7]
     DIAGONAL_COL_OFFSETS = [0, 2, 4, 6, 8]
+    # Пастельные цвета
+    COLOR_DISTRIBUTED = "#F7E4D4"    # персиковый — распределённые
+    COLOR_CONCENTRATED = "#D4E5F7"   # голубой — сосредоточенные
+    COLOR_DEFAULT = "#FFFFFF"
+    # Порядок формы по базовым столбцам (без offset):
+    # col 0: -1 | col 1: 0 (T) | col 2: 1 | col 3: 0 (Alpha/N1) | col 4: 1
+    # col 5: 2 | col 6: 3      | col 7: 2 | col 8: 1
+    X_POWERS_BY_COL = [-1, 0, 1, 0, 1, 2, 3, 2, 1]
+    # Степени x для чётных display-колонок (Бартини/Крон — СИ)
+    # display col 2→base 1: 0, col 4→base 3: 0, col 6→base 5: 2, col 8→base 7: 2
+    X_POWERS_EVEN_COL = {1: 0, 3: 0, 5: 2, 7: 2}
 
     def __init__(self, json_path="receptacle.json"):
         self.json_path = json_path
@@ -106,8 +119,10 @@ class YupanaSymbolMatrix:
     def get_diagonal_formula(self, display_row, display_col, matrix_value):
         """
         Если клетка лежит на косой диагонали, возвращает строку формулы
-        вида "1*x^1*t^0" или "6*x^3*c^-2*t^-1".
-        Иначе возвращает None.
+        вида "1*x^0*t^0" или "6*x^1*c^-2*t^-1".
+        Степень x берётся из X_POWERS_BY_COL по базовому столбцу.
+        Степень t = -step (шаг диагонали от точки привязки).
+        c^-2 добавляется для нечётных start_row при step > 0.
         """
         start_col = self.offset[1]
         col_from_start = display_col - start_col
@@ -121,19 +136,57 @@ class YupanaSymbolMatrix:
         if start_row < 0:
             return None
 
-        t_power = -step
-        x_power = 2 * step + 1
+        # Базовый столбец — для выбора степени x
+        base_c = display_col - self.offset[1]
+        if base_c < 0 or base_c >= len(self.X_POWERS_BY_COL):
+            return None
 
-        # Коэффициент — значение матрицы в этой клетке
+        x_power = self.X_POWERS_BY_COL[base_c]
+        t_power = -step
+
         parts = [str(matrix_value), f"x^{x_power}"]
 
-        # c^-2 добавляется для нечётных start_row, начиная с шага 1
+        # Релятивистская поправка: нечётный start_row + step > 0
         if start_row % 2 == 1 and step > 0:
             parts.append("c^-2")
 
         parts.append(f"t^{t_power}")
 
         return "*".join(parts)
+
+
+    def get_cell_color(self, display_row, display_col):
+        """Возвращает цвет клетки по паттерну сосредоточенные/распределённые."""
+        base_r = display_row - self.offset[0]
+        base_c = display_col - self.offset[1]
+
+        # Только для клеток физической матрицы (6 строк × 9 столбцов)
+        if base_r < 0 or base_r > 5 or base_c < 0 or base_c > 8:
+            return self.COLOR_DEFAULT
+
+        # Паттерн: блок по 4 колонки, позиции 0 и 3 — тип A, 1 и 2 — тип B
+        pos_in_block = base_c % 4
+        is_type_a = (pos_in_block == 0 or pos_in_block == 3)
+        is_even_row = (base_r % 2 == 0)
+
+        # Чётные строки: A = сосредоточенные, B = распределённые
+        # Нечётные строки: A = распределённые, B = сосредоточенные
+        if is_even_row:
+            return self.COLOR_CONCENTRATED if is_type_a else self.COLOR_DISTRIBUTED
+        else:
+            return self.COLOR_DISTRIBUTED if is_type_a else self.COLOR_CONCENTRATED
+
+    def get_even_col_formula(self, display_row, display_col, matrix_value):
+        """
+        Формула для чётного столбца в режиме DDF (без t).
+        Возвращает строку вида "1*x^0" или None.
+        """
+        base_c = display_col - self.offset[1]
+        if base_c not in self.X_POWERS_EVEN_COL:
+            return None
+        x_power = self.X_POWERS_EVEN_COL[base_c]
+        return f"{matrix_value}*x^{x_power}"
+
 
 
 
