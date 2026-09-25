@@ -270,21 +270,19 @@ class YupanaApp:
         self.build_matrix(self.matrix_b_frame, b_values, b_hl, nrows, ncols, bottom)
 
     def build_matrix(self, parent, values, highlight, nrows, ncols, bottom_row):
-        # Очистка
         for w in parent.winfo_children():
             w.destroy()
 
-        # Инициализация кэша
         if not hasattr(self, 'cached_images'):
             self.cached_images = {}
 
         symbols_dir = os.path.join(_SCRIPT_DIR, "symbols")
 
-        # ── Фиксированные размеры в пикселях ────────────────────────────────
-        CELL_W_PX = 74       # ширина ячейки в пикселях
-        CELL_H_PX = 56       # высота ячейки в пикселях
-        IMG_SIZE = (24, 24)  # размер картинки
-        CELL_W_CHARS = 10   # ширина текстовой метки в символах (для выравнивания)
+        # ── Фиксированные размеры ──────────────────────────────────────────
+        CELL_W_PX = 74
+        CELL_H_PX = 56
+        IMG_SIZE = (24, 24)
+        CELL_W_CHARS = 10
 
         # Заголовок столбцов
         hdr = ttk.Frame(parent)
@@ -304,21 +302,31 @@ class YupanaApp:
                 text = format_cell_display(val, r, c)
                 bg = "#E8E8FF" if (r, c) in highlight else "#FFFFFF"
 
-                # Контейнер ячейки с фиксированным пиксельным размером
+                # ── Проверка диагональной формулы ────────────────────────────
+                formula = None
+                if hasattr(self, 'symbol_engine'):
+                    formula = self.symbol_engine.get_diagonal_formula(r, c, val)
+
+                display_text = formula if formula else text
+                if formula:
+                    txt_font = ("Consolas", 7)
+                    txt_fg = "#006600"   # тёмно-зелёный — формулы диагоналей
+                else:
+                    txt_font = ("Consolas", 9)
+                    txt_fg = "#000000"
+
+                # Контейнер ячейки
                 cell = tk.Frame(row_frame, width=CELL_W_PX, height=CELL_H_PX,
                                 relief=tk.GROOVE, bg=bg, bd=1)
-                # КРИТИЧНО: запрещаем Frame сжиматься под содержимое
                 cell.pack_propagate(False)
                 cell.pack(side=tk.LEFT)
 
-                # --- Логика картинки ---
+                # ── Картинка символа (если есть) ─────────────────────────────
                 has_image = False
                 if hasattr(self, 'symbol_engine'):
                     filename = self.symbol_engine.get_filename_for_symbol(r, c)
-
                     if filename:
                         img_path = os.path.join(symbols_dir, filename)
-
                         if os.path.exists(img_path):
                             if filename not in self.cached_images:
                                 try:
@@ -332,20 +340,13 @@ class YupanaApp:
 
                             tk_img = self.cached_images.get(filename)
                             if tk_img is not None:
-                                # Картинка — отдельный Label сверху
                                 img_lbl = tk.Label(cell, image=tk_img, bg=bg)
                                 img_lbl.pack(side=tk.TOP, pady=(2, 1))
                                 has_image = True
 
-                # Текст — отдельный Label снизу
-                # Если есть картинка — текст меньше; если нет — занимает всю ячейку
-                if has_image:
-                    txt_font = ("Consolas", 8)
-                else:
-                    txt_font = ("Consolas", 9)
-
-                txt_lbl = tk.Label(cell, text=text, width=CELL_W_CHARS,
-                                  anchor=tk.CENTER, bg=bg, font=txt_font)
+                # ── Текст: формула диагонали или значение матрицы ────────────
+                txt_lbl = tk.Label(cell, text=display_text, width=CELL_W_CHARS,
+                                   anchor=tk.CENTER, bg=bg, font=txt_font, fg=txt_fg)
                 txt_lbl.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
 
         # Нижняя строка — коэффициенты последовательности
