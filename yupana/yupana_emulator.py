@@ -77,7 +77,7 @@ class YupanaApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Эмулятор Юпаны")
-        self.root.geometry("1725x900")
+        self.root.geometry("1900x900")
 
         self.size_var = tk.StringVar(value="9x9")
         self.mode_var = tk.StringVar(value="stirling")
@@ -277,6 +277,112 @@ class YupanaApp:
         self.build_matrix(self.matrix_a_frame, a_values, a_hl, nrows, ncols, bottom)
         self.build_matrix(self.matrix_b_frame, b_values, b_hl, nrows, ncols, bottom)
 
+    def _build_header(self, parent, ncols, cell_w, hdr_h):
+        """Отрисовывает строку заголовков столбцов."""
+        hdr = ttk.Frame(parent)
+        hdr.pack(fill=tk.X)
+        corner = tk.Frame(hdr, width=28, height=hdr_h)
+        corner.pack_propagate(False)
+        corner.pack(side=tk.LEFT)
+        for c in range(ncols):
+            hdr_cell = tk.Frame(hdr, width=cell_w, height=hdr_h)
+            hdr_cell.pack_propagate(False)
+            hdr_cell.pack(side=tk.LEFT)
+            ttk.Label(hdr_cell, text=str(c), anchor=tk.CENTER,
+                      font=("Consolas", 10, "bold")).pack(expand=True, fill=tk.BOTH)
+
+    def _build_cell(self, parent, r, c, val, highlight,
+                    cell_w, cell_h, img_size, cell_w_chars, ddf_on):
+        """Создаёт одну ячейку матрицы с символом, текстом и цветом."""
+        text = format_cell_display(val, r, c)
+
+        # ── Цвет фона ───────────────────────────────────────────────────
+        if (r, c) in highlight:
+            bg = "#E8E8FF"
+        elif hasattr(self, 'symbol_engine'):
+            bg = self.symbol_engine.get_cell_color(r, c)
+        else:
+            bg = "#FFFFFF"
+
+        # ── Определяем формулу или обычный текст ────────────────────────
+        formula = None
+        formula_color = "#006600"
+        formula_font = ("Consolas", 8)
+
+        if hasattr(self, 'symbol_engine'):
+            base_c = c - self.symbol_engine.offset[1]
+
+            if base_c % 2 == 0:
+                # Нечётный display-столбец — диагональная формула (зелёная)
+                formula = self.symbol_engine.get_cell_formula(r, c, val)
+                formula_color = "#006600"
+            elif ddf_on:
+                # Чётный display-столбец в режиме DDF — красная формула
+                formula = self.symbol_engine.get_cell_formula(r, c, val)
+                formula_color = "#CC0000"
+
+        display_text = formula if formula else text
+        if formula:
+            txt_font = formula_font
+            txt_fg = formula_color
+        else:
+            txt_font = ("Consolas", 10)
+            txt_fg = "#000000"
+
+        # ── Контейнер ячейки ────────────────────────────────────────────
+        cell = tk.Frame(parent, width=cell_w, height=cell_h,
+                        relief=tk.GROOVE, bg=bg, bd=1)
+        cell.pack_propagate(False)
+        cell.pack(side=tk.LEFT)
+
+        # ── Картинка символа ────────────────────────────────────────────
+        if hasattr(self, 'symbol_engine'):
+            filename = self.symbol_engine.get_filename_for_symbol(r, c)
+            if filename:
+                img_path = os.path.join(_SCRIPT_DIR, "symbols", filename)
+                if os.path.exists(img_path):
+                    if filename not in self.cached_images:
+                        try:
+                            from PIL import Image, ImageTk
+                            pil_img = Image.open(img_path)
+                            pil_img = pil_img.resize(img_size, Image.LANCZOS)
+                            self.cached_images[filename] = ImageTk.PhotoImage(pil_img)
+                        except Exception:
+                            self.cached_images[filename] = None
+                    tk_img = self.cached_images.get(filename)
+                    if tk_img is not None:
+                        tk.Label(cell, image=tk_img, bg=bg).pack(
+                            side=tk.TOP, pady=(4, 2))
+
+        # ── Текст ───────────────────────────────────────────────────────
+        tk.Label(cell, text=display_text, width=cell_w_chars,
+                 anchor=tk.CENTER, bg=bg, font=txt_font, fg=txt_fg,
+                 justify=tk.CENTER).pack(side=tk.TOP, expand=True, fill=tk.BOTH)
+
+
+
+    def _build_bottom_row(self, parent, ncols, bottom_row, cell_w, cell_w_chars):
+        """Отрисовывает нижнюю строку с коэффициентами последовательности."""
+        ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=4)
+        bottom_frame = ttk.Frame(parent)
+        bottom_frame.pack(fill=tk.X)
+
+        corner = tk.Frame(bottom_frame, width=28)
+        corner.pack_propagate(False)
+        corner.pack(side=tk.LEFT)
+
+        for c in range(ncols):
+            b_cell = tk.Frame(bottom_frame, width=cell_w)
+            b_cell.pack_propagate(False)
+            b_cell.pack(side=tk.LEFT)
+            val_text = ""
+            if c < len(bottom_row):
+                val_text = format_cell_display(bottom_row[c], 0, c)
+            tk.Label(b_cell, text=val_text, width=cell_w_chars, anchor=tk.CENTER,
+                     relief=tk.GROOVE, bg="#F0E8D0",
+                     font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
+
+
     def build_matrix(self, parent, values, highlight, nrows, ncols, bottom_row):
         for w in parent.winfo_children():
             w.destroy()
@@ -284,130 +390,39 @@ class YupanaApp:
         if not hasattr(self, 'cached_images'):
             self.cached_images = {}
 
-        symbols_dir = os.path.join(_SCRIPT_DIR, "symbols")
-
-        CELL_W_PX = 74
-        CELL_H_PX = 56
-        IMG_SIZE = (24, 24)
-        CELL_W_CHARS = 10
-        HDR_H_PX = 20
+        # ── Константы размеров ──────────────────────────────────────────
+        CELL_W_PX = 100
+        CELL_H_PX = 64
+        IMG_SIZE = (28, 28)
+        CELL_W_CHARS = 12
+        HDR_H_PX = 24
 
         ddf_on = getattr(self, 'ddf_var', None) and self.ddf_var.get()
 
-        # Заголовок столбцов
-        hdr = ttk.Frame(parent)
-        hdr.pack(fill=tk.X)
-        corner = tk.Frame(hdr, width=24, height=HDR_H_PX)
-        corner.pack_propagate(False)
-        corner.pack(side=tk.LEFT)
-        for c in range(ncols):
-            hdr_cell = tk.Frame(hdr, width=CELL_W_PX, height=HDR_H_PX)
-            hdr_cell.pack_propagate(False)
-            hdr_cell.pack(side=tk.LEFT)
-            ttk.Label(hdr_cell, text=str(c), anchor=tk.CENTER,
-                      font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
+        # ── Заголовок ───────────────────────────────────────────────────
+        self._build_header(parent, ncols, CELL_W_PX, HDR_H_PX)
 
-        # Основная матрица
+        # ── Основная матрица ────────────────────────────────────────────
         for r in range(nrows):
             row_frame = ttk.Frame(parent)
             row_frame.pack(fill=tk.X)
-            row_lbl_cell = tk.Frame(row_frame, width=24, height=CELL_H_PX)
+
+            row_lbl_cell = tk.Frame(row_frame, width=28, height=CELL_H_PX)
             row_lbl_cell.pack_propagate(False)
             row_lbl_cell.pack(side=tk.LEFT)
             tk.Label(row_lbl_cell, text=str(r), anchor=tk.CENTER,
-                     font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
+                     font=("Consolas", 10, "bold")).pack(expand=True, fill=tk.BOTH)
 
             for c in range(ncols):
                 val = values[r][c] if r < len(values) and c < len(values[r]) else 0
-                text = format_cell_display(val, r, c)
+                self._build_cell(row_frame, r, c, val, highlight,
+                                 CELL_W_PX, CELL_H_PX, IMG_SIZE,
+                                 CELL_W_CHARS, ddf_on)
 
-                # ── Цвет клетки ──────────────────────────────────────────────
-                if (r, c) in highlight:
-                    bg = "#E8E8FF"
-                elif hasattr(self, 'symbol_engine'):
-                    bg = self.symbol_engine.get_cell_color(r, c)
-                else:
-                    bg = "#FFFFFF"
-
-                # ── Определяем отображаемый текст ────────────────────────────
-                formula = None
-                formula_color = "#006600"   # зелёный — по умолчанию для диагоналей с t
-                formula_font = ("Consolas", 7)
-
-                if hasattr(self, 'symbol_engine'):
-                    # Проверяем: это чётный столбец и включён DDF?
-                    if ddf_on and (c - self.symbol_engine.offset[1]) % 2 == 1:
-                        # Чётный display-столбец → форма без t, красным
-                        even_formula = self.symbol_engine.get_even_col_formula(r, c, val)
-                        if even_formula:
-                            formula = even_formula
-                            formula_color = "#CC0000"   # красный
-                    else:
-                        # Нечётный display-столбец → диагональ с t, зелёным
-                        formula = self.symbol_engine.get_diagonal_formula(r, c, val)
-
-                display_text = formula if formula else text
-                if formula:
-                    txt_font = formula_font
-                    txt_fg = formula_color
-                else:
-                    txt_font = ("Consolas", 9)
-                    txt_fg = "#000000"
-
-                # Контейнер ячейки
-                cell = tk.Frame(row_frame, width=CELL_W_PX, height=CELL_H_PX,
-                                relief=tk.GROOVE, bg=bg, bd=1)
-                cell.pack_propagate(False)
-                cell.pack(side=tk.LEFT)
-
-                # ── Картинка символа ─────────────────────────────────────────
-                has_image = False
-                if hasattr(self, 'symbol_engine'):
-                    filename = self.symbol_engine.get_filename_for_symbol(r, c)
-                    if filename:
-                        img_path = os.path.join(symbols_dir, filename)
-                        if os.path.exists(img_path):
-                            if filename not in self.cached_images:
-                                try:
-                                    from PIL import Image, ImageTk
-                                    pil_img = Image.open(img_path)
-                                    pil_img = pil_img.resize(IMG_SIZE, Image.LANCZOS)
-                                    tk_img = ImageTk.PhotoImage(pil_img)
-                                    self.cached_images[filename] = tk_img
-                                except Exception:
-                                    self.cached_images[filename] = None
-
-                            tk_img = self.cached_images.get(filename)
-                            if tk_img is not None:
-                                img_lbl = tk.Label(cell, image=tk_img, bg=bg)
-                                img_lbl.pack(side=tk.TOP, pady=(2, 1))
-                                has_image = True
-
-                # ── Текст ────────────────────────────────────────────────────
-                txt_lbl = tk.Label(cell, text=display_text, width=CELL_W_CHARS,
-                                   anchor=tk.CENTER, bg=bg, font=txt_font, fg=txt_fg)
-                txt_lbl.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
-
-        # Нижняя строка
+        # ── Нижняя строка ────────────────────────────────────────────────
         if bottom_row:
-            ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=3)
-            bottom_frame = ttk.Frame(parent)
-            bottom_frame.pack(fill=tk.X)
-            corner2 = tk.Frame(bottom_frame, width=24)
-            corner2.pack_propagate(False)
-            corner2.pack(side=tk.LEFT)
-            for c in range(ncols):
-                b_cell = tk.Frame(bottom_frame, width=CELL_W_PX)
-                b_cell.pack_propagate(False)
-                b_cell.pack(side=tk.LEFT)
-                if c < len(bottom_row):
-                    val = bottom_row[c]
-                    text = format_cell_display(val, 0, c)
-                else:
-                    text = ""
-                tk.Label(b_cell, text=text, width=CELL_W_CHARS, anchor=tk.CENTER,
-                         relief=tk.GROOVE, bg="#F0E8D0",
-                         font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
+            self._build_bottom_row(parent, ncols, bottom_row,
+                                   CELL_W_PX, CELL_W_CHARS)
 
 
 
