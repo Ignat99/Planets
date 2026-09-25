@@ -24,10 +24,25 @@ class YupanaSymbolMatrix:
     # Порядок формы по базовым столбцам (без offset):
     # col 0: -1 | col 1: 0 (T) | col 2: 1 | col 3: 0 (Alpha/N1) | col 4: 1
     # col 5: 2 | col 6: 3      | col 7: 2 | col 8: 1
-    X_POWERS_BY_COL = [-1, 0, 1, 0, 1, 2, 3, 2, 1]
+    X_POWERS_BY_COL = [-1, 0, 1, 0, 1, 2, 3, 2, 3, 4, 4]
+#    X_POWERS_BY_COL = [1, 0, 1, 2, 3, 2, 3, 4, 4]
+
+    # Фаза пространства: добавка к степени x во всех формулах.
+    # 0 — свёрнутое (Бартини, L = x^-1), c^2 в парах присутствует
+    # 2 — плоское (L = x^1), c^2 в парах сокращается
+    # 3 — объёмное (L = x^2)
+    X_PHASE_SHIFT = 0
+
     # Степени x для чётных display-колонок (Бартини/Крон — СИ)
     # display col 2→base 1: 0, col 4→base 3: 0, col 6→base 5: 2, col 8→base 7: 2
     X_POWERS_EVEN_COL = {1: 0, 3: 0, 5: 2, 7: 2}
+
+
+    # Якорные клетки: (display_row, display_col) -> (c_power, t_power)
+    ANCHORS = {
+        (2, 4): (0, 0),   # Alpha — распределённая
+        (2, 3): (0, -1),   # F — сосредоточенная
+    }
 
     def __init__(self, json_path="receptacle.json"):
         self.json_path = json_path
@@ -117,13 +132,6 @@ class YupanaSymbolMatrix:
         return matrix
 
     def get_diagonal_formula(self, display_row, display_col, matrix_value):
-        """
-        Если клетка лежит на косой диагонали, возвращает строку формулы
-        вида "1*x^0*t^0" или "6*x^1*c^-2*t^-1".
-        Степень x берётся из X_POWERS_BY_COL по базовому столбцу.
-        Степень t = -step (шаг диагонали от точки привязки).
-        c^-2 добавляется для нечётных start_row при step > 0.
-        """
         start_col = self.offset[1]
         col_from_start = display_col - start_col
 
@@ -136,20 +144,21 @@ class YupanaSymbolMatrix:
         if start_row < 0:
             return None
 
-        # Базовый столбец — для выбора степени x
         base_c = display_col - self.offset[1]
         if base_c < 0 or base_c >= len(self.X_POWERS_BY_COL):
             return None
 
-        x_power = self.X_POWERS_BY_COL[base_c]
         t_power = -step
+        x_power = self.X_POWERS_BY_COL[base_c]
+
+        # c^-2 для любого нечётного start_row (не только step > 0)
+        has_c2 = (start_row % 2 == 1)
+        if has_c2:
+            x_power += 2
 
         parts = [str(matrix_value), f"x^{x_power}"]
-
-        # Релятивистская поправка: нечётный start_row + step > 0
-        if start_row % 2 == 1 and step > 0:
+        if has_c2:
             parts.append("c^-2")
-
         parts.append(f"t^{t_power}")
 
         return "*".join(parts)
@@ -177,16 +186,180 @@ class YupanaSymbolMatrix:
             return self.COLOR_DISTRIBUTED if is_type_a else self.COLOR_CONCENTRATED
 
     def get_even_col_formula(self, display_row, display_col, matrix_value):
-        """
-        Формула для чётного столбца в режиме DDF (без t).
-        Возвращает строку вида "1*x^0" или None.
-        """
         base_c = display_col - self.offset[1]
         if base_c not in self.X_POWERS_EVEN_COL:
             return None
-        x_power = self.X_POWERS_EVEN_COL[base_c]
-        return f"{matrix_value}*x^{x_power}"
 
+        x_power = self.X_POWERS_EVEN_COL[base_c]
+
+        # Сосед справа: нечётный столбец base_c + 1
+        neighbor_col_from_start = base_c + 1
+        if neighbor_col_from_start not in self.DIAGONAL_COL_OFFSETS:
+            return None
+
+        neighbor_step = self.DIAGONAL_COL_OFFSETS.index(neighbor_col_from_start)
+        neighbor_start_row = display_row - neighbor_step
+
+        if neighbor_start_row < 0:
+            return None
+
+        neighbor_t = -neighbor_step
+        neighbor_has_c2 = (neighbor_start_row % 2 == 1)
+
+        # Поправка: +2 если у соседа нет c^-2, +0 если есть
+        t_power = neighbor_t + (0 if neighbor_has_c2 else 2)
+        has_c2 = neighbor_has_c2
+
+        parts = [str(matrix_value), f"x^{x_power}"]
+        if has_c2:
+            parts.append("c^-2")
+        parts.append(f"t^{t_power}")
+
+        return "*".join(parts)
+
+
+    def _get_cell_type(self, r, c):
+        color = self.get_cell_color(r, c)
+        if color == self.COLOR_DISTRIBUTED:
+            return "distributed"
+        elif color == self.COLOR_CONCENTRATED:
+            return "concentrated"
+        return None
+
+    def _get_diagonal_transitions(self, r, c):
+        """4 косых перехода: (nr, nc, delta_c, delta_t)."""
+        t = self._get_cell_type(r, c)
+        if t == "distributed":
+            return [
+                (r - 1, c - 2,  0,  1),   # ↖  t^1
+                (r - 1, c + 2, -2, -1),   # ↗  c^-2 * t^-1
+                (r + 1, c + 2,  0, -1),   # ↘  t^-1
+                (r + 1, c - 2,  2,  1),   # ↙  c^2 * t^1
+            ]
+        elif t == "concentrated":
+            return [
+                (r - 1, c - 2,  2,  1),   # ↖  c^2 * t^1
+                (r - 1, c + 2,  0, -1),   # ↗  t^-1
+                (r + 1, c + 2, -2, -1),   # ↘  c^-2 * t^-1
+                (r + 1, c - 2,  0,  1),   # ↙  t^1
+            ]
+        return []
+
+    def _get_vertical_transitions(self, r, c):
+        """Вертикальные переходы c^4 / c^-4."""
+        t = self._get_cell_type(r, c)
+        if t == "distributed":
+            return [
+                (r + 4, c,  4, 0),   # c^4  → строка +4
+                (r - 4, c, -4, 0),   # c^-4 → строка −4
+            ]
+        elif t == "concentrated":
+            return [
+                (r - 4, c,  4, 0),   # c^4  → строка −4
+                (r + 4, c, -4, 0),   # c^-4 → строка +4
+            ]
+        return []
+
+    def _get_horizontal_transitions(self, r, c):
+        """Горизонтальные переходы между однотипными соседями
+        (производная по x): вправо c^2*t^1, влево c^-2*t^-1."""
+        transitions = []
+        t1 = self._get_cell_type(r, c)
+        if not t1:
+            return transitions
+
+        # Вправо (c+1)
+        t2 = self._get_cell_type(r, c + 1)
+        if t2 and t2 == t1:
+            transitions.append((r, c + 1, 2, 1))
+
+        # Влево (c-1)
+        t2 = self._get_cell_type(r, c - 1)
+        if t2 and t2 == t1:
+            transitions.append((r, c - 1, -2, -1))
+
+        return transitions
+
+    def _get_all_transitions(self, r, c):
+        return (self._get_diagonal_transitions(r, c) +
+                self._get_vertical_transitions(r, c) +
+                self._get_horizontal_transitions(r, c))
+
+    def compute_all_formulas(self, nrows=7, ncols=9):
+        """BFS от якорей: (c_power, t_power) для всех клеток."""
+        from collections import deque
+
+        formula_powers = {}
+
+        for (ar, ac), (c0, t0) in self.ANCHORS.items():
+            queue = deque()
+            queue.append((ar, ac, c0, t0))
+            visited = {(ar, ac): (c0, t0)}
+
+            while queue:
+                r, c, cp, tp = queue.popleft()
+                for nr, nc, dc, dt in self._get_all_transitions(r, c):
+                    base_r = nr - self.offset[0]
+                    base_c = nc - self.offset[1]
+                    if base_r < 0 or base_r >= nrows or base_c < 0 or base_c >= ncols:
+                        continue
+                    if (nr, nc) in visited:
+                        continue
+                    visited[(nr, nc)] = (cp + dc, tp + dt)
+                    queue.append((nr, nc, cp + dc, tp + dt))
+
+            formula_powers.update(visited)
+
+        self._formula_powers = formula_powers
+        return formula_powers
+
+    def get_cell_formula_old(self, display_row, display_col, matrix_value):
+        """Полная формула: val*x^p*c^q*t^r."""
+        if not hasattr(self, '_formula_powers'):
+            self.compute_all_formulas()
+
+        key = (display_row, display_col)
+        if key not in self._formula_powers:
+            return None
+
+        c_power, t_power = self._formula_powers[key]
+        base_c = display_col - self.offset[1]
+        if base_c < 0 or base_c >= len(self.X_POWERS_BY_COL):
+            return None
+
+        x_power = self.X_POWERS_BY_COL[base_c]
+
+        parts = [str(matrix_value), f"x^{x_power}"]
+        if c_power != 0:
+            parts.append(f"c^{c_power}")
+        if t_power != 0:
+            parts.append(f"t^{t_power}")
+
+        return "*".join(parts)
+
+    def get_cell_formula(self, display_row, display_col, matrix_value):
+        """Полная формула: val*x^p*c^q*t^r."""
+        if not hasattr(self, '_formula_powers'):
+            self.compute_all_formulas()
+
+        key = (display_row, display_col)
+        if key not in self._formula_powers:
+            return None
+
+        c_power, t_power = self._formula_powers[key]
+        base_c = display_col - self.offset[1]
+        if base_c < 0 or base_c >= len(self.X_POWERS_BY_COL):
+            return None
+
+        x_power = self.X_POWERS_BY_COL[base_c] + self.X_PHASE_SHIFT
+
+        parts = [str(matrix_value), f"x^{x_power}"]
+        if c_power != 0:
+            parts.append(f"c^{c_power}")
+        if t_power != 0:
+            parts.append(f"t^{t_power}")
+
+        return "*".join(parts)
 
 
 
