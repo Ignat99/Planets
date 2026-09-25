@@ -41,93 +41,13 @@ import io
 import contextlib
 from fractions import Fraction
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Глифы для токапу
-# ──────────────────────────────────────────────────────────────────────────────
+from yupana_arrays import (
+    GLYPHS,
+    YUPANKI_DIR,
+    YUPANKI0_DATA,
+)
 
-GLYPHS = [
-    '\u25CF', '\u25C6', '\u25B2', '\u25A0', '\u2605',
-    '\u2724', '\u2725', '\u2726', '\u2727', '\u2728',
-    '\u2729', '\u272A', '\u272B', '\u272C', '\u272D',
-    '\u272E', '\u272F', '\u2730', '\u2731', '\u2732',
-    '\u2733', '\u2734', '\u2735', '\u2736', '\u2737',
-    '\u2738', '\u2739', '\u273A', '\u273B', '\u273C',
-    '\u273D', '\u273E', '\u273F', '\u2740', '\u2741',
-    '\u2742', '\u2743', '\u2744', '\u2745', '\u2746',
-]
-
-YUPANKI_DIR = "yupanki"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# yupanki0.json — встроенные действия
-# ──────────────────────────────────────────────────────────────────────────────
-
-YUPANKI0_DATA = {
-    "name": "yupanki0",
-    "action_desc": "Встроенные действия эмулятора Юпаны",
-    "actions": [
-        {
-            "name": "Действие 0: Инициализация",
-            "action_desc": "1, 3, 10, 42, 216, 1320, 9360, 75600, 685440, 6894720",
-            "action": (
-                "seq = [1, 3, 10, 42, 216, 1320, 9360, 75600, 685440, 6894720]\n"
-                "ctx.seq = seq\n"
-                "ctx.bottom_row = seq[:ctx.ncols]"
-            )
-        },
-        {
-            "name": "Действие 1: Разносная схема",
-            "action_desc": "Разностная схема",
-            "action": "ctx.mode = 'rassnos'"
-        },
-        {
-            "name": "Действие 2: Переход к Стирлингу",
-            "action_desc": "Умножение верхнего элемента на номер строки",
-            "action": "ctx.mode = 'stirling'"
-        },
-        {
-            "name": "Действие 3: Дифференцирование",
-            "action_desc": "Деление на номер строки, переход вверх",
-            "action": "ctx.mode = 'diff'"
-        },
-        {
-            "name": "Действие 4: Диагональ n-k, n-2k (A391838)",
-            "action_desc": "Косые диагонали s(n-k, n-2k)",
-            "action": "ctx.mode = 'diagonal'"
-        },
-        {
-            "name": "Действие 5: Прямая диагональ n, n-k (Фибоначчи)",
-            "action_desc": "Прямые диагонали s(n, n-k)",
-            "action": "ctx.mode = 'fibonacci'"
-        },
-        {
-            "name": "Действие 6: Нормировка a_n/n!",
-            "action_desc": "Деление на факториал номера строки",
-            "action": "ctx.mode = 'normalized'"
-        },
-        {
-            "name": "Действие 7: Обращение ряда (A391838)",
-            "action_desc": "Вычисление A391838 через диагонали Стирлинга",
-            "action": (
-                "from yupana_math import compute_a391838_sequence\n"
-                "seq = compute_a391838_sequence(ctx.nrows - 1)\n"
-                "ctx.seq = seq\n"
-                "ctx.bottom_row = seq[:ctx.ncols]\n"
-                "ctx.mode = 'diagonal'"
-            )
-        },
-        {
-            "name": "Действие 8: Сброс матрицы",
-            "action_desc": "Сброс к исходному состоянию",
-            "action": (
-                "ctx.mode = 'stirling'\n"
-                "ctx.seq = []\n"
-                "ctx.bottom_row = []"
-            )
-        },
-    ]
-}
-
+from yupana_symbols_matrix import YupanaSymbolMatrix
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Контекст для exec() кода действий
@@ -157,7 +77,7 @@ class YupanaApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Эмулятор Юпаны")
-        self.root.geometry("1150x820")
+        self.root.geometry("1725x900")
 
         self.size_var = tk.StringVar(value="9x9")
         self.mode_var = tk.StringVar(value="stirling")
@@ -188,6 +108,12 @@ class YupanaApp:
         # Создание и загрузка yupanki0
         self.ensure_yupanki0()
         self.load_yupanki0()
+
+        self.symbol_engine = YupanaSymbolMatrix("receptacle.json")
+        # Можно задать начальный сдвиг, если нужно
+        # self.symbol_engine.set_offset(0, 0) 
+        self.symbol_engine.set_offset(1, 1)
+
 
         self.build_ui()
         self.refresh()
@@ -344,26 +270,83 @@ class YupanaApp:
         self.build_matrix(self.matrix_b_frame, b_values, b_hl, nrows, ncols, bottom)
 
     def build_matrix(self, parent, values, highlight, nrows, ncols, bottom_row):
+        # Очистка
         for w in parent.winfo_children():
             w.destroy()
 
+        # Инициализация кэша
+        if not hasattr(self, 'cached_images'):
+            self.cached_images = {}
+
+        symbols_dir = os.path.join(_SCRIPT_DIR, "symbols")
+
+        # ── Фиксированные размеры в пикселях ────────────────────────────────
+        CELL_W_PX = 74       # ширина ячейки в пикселях
+        CELL_H_PX = 56       # высота ячейки в пикселях
+        IMG_SIZE = (24, 24)  # размер картинки
+        CELL_W_CHARS = 10   # ширина текстовой метки в символах (для выравнивания)
+
+        # Заголовок столбцов
         hdr = ttk.Frame(parent)
         hdr.pack(fill=tk.X)
         ttk.Label(hdr, text="", width=3).pack(side=tk.LEFT)
         for c in range(ncols):
-            ttk.Label(hdr, text=str(c), width=8, anchor=tk.CENTER).pack(side=tk.LEFT)
+            ttk.Label(hdr, text=str(c), width=CELL_W_CHARS, anchor=tk.CENTER).pack(side=tk.LEFT)
 
+        # Основная матрица
         for r in range(nrows):
             row_frame = ttk.Frame(parent)
             row_frame.pack(fill=tk.X)
             ttk.Label(row_frame, text=str(r), width=3).pack(side=tk.LEFT)
+
             for c in range(ncols):
                 val = values[r][c] if r < len(values) and c < len(values[r]) else 0
                 text = format_cell_display(val, r, c)
                 bg = "#E8E8FF" if (r, c) in highlight else "#FFFFFF"
-                lbl = tk.Label(row_frame, text=text, width=8, anchor=tk.CENTER,
-                               relief=tk.GROOVE, bg=bg, font=("Consolas", 9))
-                lbl.pack(side=tk.LEFT)
+
+                # Контейнер ячейки с фиксированным пиксельным размером
+                cell = tk.Frame(row_frame, width=CELL_W_PX, height=CELL_H_PX,
+                                relief=tk.GROOVE, bg=bg, bd=1)
+                # КРИТИЧНО: запрещаем Frame сжиматься под содержимое
+                cell.pack_propagate(False)
+                cell.pack(side=tk.LEFT)
+
+                # --- Логика картинки ---
+                has_image = False
+                if hasattr(self, 'symbol_engine'):
+                    filename = self.symbol_engine.get_filename_for_symbol(r, c)
+
+                    if filename:
+                        img_path = os.path.join(symbols_dir, filename)
+
+                        if os.path.exists(img_path):
+                            if filename not in self.cached_images:
+                                try:
+                                    from PIL import Image, ImageTk
+                                    pil_img = Image.open(img_path)
+                                    pil_img = pil_img.resize(IMG_SIZE, Image.LANCZOS)
+                                    tk_img = ImageTk.PhotoImage(pil_img)
+                                    self.cached_images[filename] = tk_img
+                                except Exception:
+                                    self.cached_images[filename] = None
+
+                            tk_img = self.cached_images.get(filename)
+                            if tk_img is not None:
+                                # Картинка — отдельный Label сверху
+                                img_lbl = tk.Label(cell, image=tk_img, bg=bg)
+                                img_lbl.pack(side=tk.TOP, pady=(2, 1))
+                                has_image = True
+
+                # Текст — отдельный Label снизу
+                # Если есть картинка — текст меньше; если нет — занимает всю ячейку
+                if has_image:
+                    txt_font = ("Consolas", 8)
+                else:
+                    txt_font = ("Consolas", 9)
+
+                txt_lbl = tk.Label(cell, text=text, width=CELL_W_CHARS,
+                                  anchor=tk.CENTER, bg=bg, font=txt_font)
+                txt_lbl.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
 
         # Нижняя строка — коэффициенты последовательности
         if bottom_row:
@@ -378,10 +361,17 @@ class YupanaApp:
                     text = format_cell_display(val, 0, c)
                 else:
                     text = ""
-                lbl = tk.Label(bottom_frame, text=text, width=8, anchor=tk.CENTER,
+                lbl = tk.Label(bottom_frame, text=text, width=CELL_W_CHARS, anchor=tk.CENTER,
                                relief=tk.GROOVE, bg="#F0E8D0",
                                font=("Consolas", 9, "bold"))
                 lbl.pack(side=tk.LEFT)
+
+
+
+
+
+
+
 
     # ── Кнопка-глиф ────────────────────────────────────────────────────────────
 
