@@ -1,69 +1,67 @@
 """
-yupana_emulator.py - GUI эмулятора Юпаны.
+yupana_emulator.py — Эмулятор Юпаны с Tkinter GUI.
 
-Импортирует математику из yupana_math (чистый модуль, без GUI).
-Макросы yupanki сохраняются/загружаются из каталога yupanki/.
-yupanki0.json - встроенные действия, грузится при старте.
-
-Архитектура:
-  yupana_math.py  - чистая математика (Stirling, A391838, обращение ряда, экспорт)
-  yupana_emulator.py - Tkinter GUI (этот файл)
-  test_yupana_math.py - unit-тесты
-
-Запуск: python yupana_emulator.py
+Импортирует yupana_math (чистая математика, без GUI).
+Две матрицы: A (исходная — Стирлинг) и B (после действия).
+Три кнопки экспорта: CSV, JSON, SPICE.
+Макросы yupanki: сохранение/загрузка последовательностей действий.
 """
 
+import sys
+import os
+
+# ── Подключение локального модуля yupana_math ─────────────────────────────────
+# Добавляем каталог этого скрипта в sys.path — работает на Windows и Linux
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from yupana_math import (
+    S_MAX,
+    get_matrix_values,
+    compute_a391838,
+    compute_a391838_sequence,
+    verify_a391838,
+    multiplicative_inverse,
+    compositional_inverse,
+    difference_triangle,
+    format_cell_display,
+    export_matrix_csv,
+    export_sequence_json,
+    export_spice_subcircuit,
+    a391838_to_float,
+)
+
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 import math
 import json
-import os
 import re
 import io
 import contextlib
-import sys
-
-# Добавляем каталог, где лежит yupana_emulator6.py, в путь поиска
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-
-# Для осциллятора:
-from yupana_oscillator import oscillator_to_yupana_bottom_row
-bottom_row = oscillator_to_yupana_bottom_row(steps=9, amplitude=100000, shift_bit=6)
-
-# Для решётки:
-from yupana_lattice_hook import lattice_to_yupana, lattice_to_bottom_row
-left_row, right_row, result, info = lattice_to_yupana(23, 41)
-bottom = lattice_to_bottom_row(23, 41)
-
-
-from yupana_math import (
-    S_MAX, stirling_first_kind,
-    rassnos_matrix, stirling_matrix, diff_matrix, normalized_matrix,
-    fibonacci_diagonal, a391838_diagonal,
-    compute_a391838, a391838_to_float, a391838_polynomial,
-    multiplicative_inverse, compositional_inverse,
-    difference_triangle,
-    plotnikov_9cell, plotnikov_maxwell_6cell,
-    export_matrix_csv, export_sequence_json, export_spice_subcircuit,
-    verify_a391838,
-)
 from fractions import Fraction
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Глифы для токапу
+# ──────────────────────────────────────────────────────────────────────────────
+
 GLYPHS = [
-    "\u25CF", "\u25C6", "\u25B2", "\u25A0", "\u2605",
-    "\u2724", "\u2725", "\u2726", "\u2727", "\u2728",
-    "\u2729", "\u272A", "\u272B", "\u272C", "\u272D",
-    "\u272E", "\u272F", "\u2730", "\u2731", "\u2732",
-    "\u2733", "\u2734", "\u2735", "\u2736", "\u2737",
-    "\u2738", "\u2739", "\u273A", "\u273B", "\u273C",
-    "\u273D", "\u273E", "\u273F", "\u2740", "\u2741",
-    "\u2742", "\u2743", "\u2744", "\u2745", "\u2746",
+    '\u25CF', '\u25C6', '\u25B2', '\u25A0', '\u2605',
+    '\u2724', '\u2725', '\u2726', '\u2727', '\u2728',
+    '\u2729', '\u272A', '\u272B', '\u272C', '\u272D',
+    '\u272E', '\u272F', '\u2730', '\u2731', '\u2732',
+    '\u2733', '\u2734', '\u2735', '\u2736', '\u2737',
+    '\u2738', '\u2739', '\u273A', '\u273B', '\u273C',
+    '\u273D', '\u273E', '\u273F', '\u2740', '\u2741',
+    '\u2742', '\u2743', '\u2744', '\u2745', '\u2746',
 ]
 
 YUPANKI_DIR = "yupanki"
 
-# yupanki0.json - встроенные действия
+# ──────────────────────────────────────────────────────────────────────────────
+# yupanki0.json — встроенные действия
+# ──────────────────────────────────────────────────────────────────────────────
+
 YUPANKI0_DATA = {
     "name": "yupanki0",
     "action_desc": "Встроенные действия эмулятора Юпаны",
@@ -108,16 +106,14 @@ YUPANKI0_DATA = {
             "action": "ctx.mode = 'normalized'"
         },
         {
-            "name": "Действие 7: Обращение ряда",
-            "action_desc": "Композиционное обращение степенного ряда",
+            "name": "Действие 7: Обращение ряда (A391838)",
+            "action_desc": "Вычисление A391838 через диагонали Стирлинга",
             "action": (
-                "# Вычисляем A391838 и обращаем ряд\n"
-                "from yupana_math import compute_a391838, compositional_inverse\n"
-                "a_seq = compute_a391838(ctx.ncols - 1)\n"
-                "# A391838 как ряд: a_0 + a_1*x + ... - нужен сдвиг для обращения\n"
-                "# Для обращения нужен a_0=0, поэтому используем производную\n"
-                "ctx.mode = 'stirling'\n"
-                "ctx.bottom_row = [float(x) for x in a_seq[:ctx.ncols]]"
+                "from yupana_math import compute_a391838_sequence\n"
+                "seq = compute_a391838_sequence(ctx.nrows - 1)\n"
+                "ctx.seq = seq\n"
+                "ctx.bottom_row = seq[:ctx.ncols]\n"
+                "ctx.mode = 'diagonal'"
             )
         },
         {
@@ -132,6 +128,10 @@ YUPANKI0_DATA = {
     ]
 }
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Контекст для exec() кода действий
+# ──────────────────────────────────────────────────────────────────────────────
 
 class ActionContext:
     """Контекст, передаваемый в exec() для кода действия."""
@@ -149,11 +149,15 @@ class ActionContext:
         app.refresh()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Приложение
+# ──────────────────────────────────────────────────────────────────────────────
+
 class YupanaApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Эмулятор Юпаны")
-        self.root.geometry("1100x800")
+        self.root.geometry("1150x820")
 
         self.size_var = tk.StringVar(value="9x9")
         self.mode_var = tk.StringVar(value="stirling")
@@ -161,25 +165,34 @@ class YupanaApp:
 
         self.action_count = 0
         self.tokapu_buttons = []
-        self.btn_width = 50
-        self.btn_height = 45
         self.btn_spacing_x = 58
         self.btn_spacing_y = 55
         self.max_cols = 16
 
+        # Последовательность и нижняя строка
         self.seq = []
         self.bottom_row = []
 
+        # История действий текущей сессии
         self.action_history = []
+
+        # Загруженные макросы
         self.loaded_macros = {}
+
+        # Действия из yupanki0
         self.yupanki0_actions = []
+
+        # Значения выпадающего списка
         self.current_action_values = []
 
+        # Создание и загрузка yupanki0
         self.ensure_yupanki0()
         self.load_yupanki0()
 
         self.build_ui()
         self.refresh()
+
+    # ── yupanki0 ────────────────────────────────────────────────────────────────
 
     def ensure_yupanki0(self):
         os.makedirs(YUPANKI_DIR, exist_ok=True)
@@ -200,19 +213,21 @@ class YupanaApp:
         if self.current_action_values:
             self.action_var.set(self.current_action_values[0])
 
+    # ── Выполнение кода действия ────────────────────────────────────────────────
+
     def execute_action_code(self, code, ctx):
         if not code or not code.strip():
             return ""
         output = io.StringIO()
         namespace = {
-            "ctx": ctx, "math": math, "S_MAX": S_MAX,
+            "ctx": ctx,
+            "math": math,
+            "S_MAX": S_MAX,
+            "Fraction": Fraction,
             "compute_a391838": compute_a391838,
-            "compositional_inverse": compositional_inverse,
-            "multiplicative_inverse": multiplicative_inverse,
+            "compute_a391838_sequence": compute_a391838_sequence,
             "difference_triangle": difference_triangle,
-            "export_matrix_csv": export_matrix_csv,
-            "export_sequence_json": export_sequence_json,
-            "export_spice_subcircuit": export_spice_subcircuit,
+            "__builtins__": __builtins__,
         }
         try:
             with contextlib.redirect_stdout(output):
@@ -221,8 +236,10 @@ class YupanaApp:
             return f"Ошибка: {e}"
         return output.getvalue().strip()
 
+    # ── UI ────────────────────────────────────────────────────────────────────
+
     def build_ui(self):
-        # Верхняя панель
+        # ── Верхняя панель ──────────────────────────────────────────────────
         top = ttk.Frame(self.root, padding=5)
         top.pack(fill=tk.X)
 
@@ -243,22 +260,23 @@ class YupanaApp:
         mode_combo.pack(side=tk.LEFT, padx=2)
         mode_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh())
 
-        # Экспорт
-        ttk.Button(top, text="Экспорт CSV", command=self.export_csv).pack(side=tk.RIGHT, padx=2)
-        ttk.Button(top, text="Экспорт JSON", command=self.export_json).pack(side=tk.RIGHT, padx=2)
-        ttk.Button(top, text="Экспорт SPICE", command=self.export_spice).pack(side=tk.RIGHT, padx=2)
+        # Кнопки экспорта
+        ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Button(top, text="Экспорт CSV", command=self.export_csv).pack(side=tk.LEFT, padx=2)
+        ttk.Button(top, text="Экспорт JSON", command=self.export_json).pack(side=tk.LEFT, padx=2)
+        ttk.Button(top, text="Экспорт SPICE", command=self.export_spice).pack(side=tk.LEFT, padx=2)
 
-        # Матрицы
+        # ── Область матриц ─────────────────────────────────────────────────
         matrix_frame = ttk.Frame(self.root)
         matrix_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.matrix_a_frame = ttk.LabelFrame(matrix_frame, text="Матрица A", padding=5)
+        self.matrix_a_frame = ttk.LabelFrame(matrix_frame, text="Матрица A (исходная — Стирлинг)", padding=5)
         self.matrix_a_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.matrix_b_frame = ttk.LabelFrame(matrix_frame, text="Матрица B (после действия)", padding=5)
         self.matrix_b_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Панель действий
+        # ── Панель действий ─────────────────────────────────────────────────
         action_frame = ttk.Frame(self.root, padding=5)
         action_frame.pack(fill=tk.X)
 
@@ -274,7 +292,7 @@ class YupanaApp:
         ttk.Button(action_frame, text="Очистить Юпану",
                    command=self.clear_tokapu).pack(side=tk.RIGHT, padx=5)
 
-        # Токапу
+        # ── Область токапу ──────────────────────────────────────────────────
         tokapu_outer = ttk.Frame(self.root, padding=5)
         tokapu_outer.pack(fill=tk.BOTH, expand=False)
 
@@ -285,7 +303,7 @@ class YupanaApp:
                                         highlightbackground="#999")
         self.tokapu_canvas.pack(fill=tk.BOTH, expand=True)
 
-        # Протокол
+        # ── Протокол ─────────────────────────────────────────────────────────
         proto_frame = ttk.Frame(self.root, padding=5)
         proto_frame.pack(fill=tk.X)
 
@@ -294,6 +312,12 @@ class YupanaApp:
                                      bg="#FAFAF0", wrap=tk.WORD)
         self.protocol_text.pack(fill=tk.X)
 
+        # Стартовая запись
+        ok = verify_a391838()
+        self.log(f"Эмулятор Юпаны запущен. A391838 проверен: {'OK' if ok else 'FAIL'}")
+
+    # ── Размеры ──────────────────────────────────────────────────────────────
+
     def get_size(self):
         s = self.size_var.get()
         if s == "6x6": return 6, 6
@@ -301,71 +325,25 @@ class YupanaApp:
         if s == "18x9": return 18, 9
         return 9, 9
 
-    def get_matrix_values(self, mode, nrows, ncols):
-        """Делегирует в yupana_math."""
-        highlight = set()
-
-        if mode == "stirling":
-            values = stirling_matrix(nrows, ncols, S_MAX)
-        elif mode == "rassnos":
-            values = rassnos_matrix(nrows, ncols)
-        elif mode == "diagonal":
-            values, highlight = a391838_diagonal(nrows, ncols, S_MAX)
-        elif mode == "diff":
-            values = diff_matrix(nrows, ncols, S_MAX)
-        elif mode == "normalized":
-            values = normalized_matrix(nrows, ncols, S_MAX)
-            for n in range(nrows):
-                highlight.add((n, 0))
-        elif mode == "fibonacci":
-            values, highlight = fibonacci_diagonal(nrows, ncols, S_MAX)
-        else:
-            values = [[0]*ncols for _ in range(nrows)]
-
-        return values, highlight
-
-    def format_cell(self, val, n, k):
-        if val == 0:
-            return ""
-        if isinstance(val, Fraction):
-            if val.denominator == 1:
-                v = val.numerator
-                if k == 0:
-                    return str(v)
-                return f"{v}\u00B7x^{k}"
-            else:
-                s = str(val)
-                return f"{s}\u00B7x^{k}"
-        if isinstance(val, float) and val == int(val):
-            val = int(val)
-        if isinstance(val, int):
-            if k == 0:
-                return str(val)
-            return f"{val}\u00B7x^{k}"
-        else:
-            if abs(val - round(val)) < 1e-9:
-                v = int(round(val))
-                if k == 0:
-                    return str(v)
-                return f"{v}\u00B7x^{k}"
-            s = f"{val:.3g}"
-            return f"{s}\u00B7x^{k}"
+    # ── Перерисовка ────────────────────────────────────────────────────────────
 
     def refresh(self):
         nrows, ncols = self.get_size()
         mode = self.mode_var.get()
-        values, hl = self.get_matrix_values(mode, nrows, ncols)
 
+        # Матрица A — всегда Стирлинг (исходная)
+        a_values, a_hl = get_matrix_values("stirling", nrows, ncols)
+
+        # Матрица B — текущий режим
+        b_values, b_hl = get_matrix_values(mode, nrows, ncols)
+
+        # Усечение нижней строки
         bottom = self.bottom_row[:ncols] if self.bottom_row else []
 
-        # Матрица A — исходная (всегда stirling)
-        a_values = stirling_matrix(nrows, ncols, S_MAX)
-        self.build_matrix(self.matrix_a_frame, "A", a_values, set(), nrows, ncols, bottom)
+        self.build_matrix(self.matrix_a_frame, a_values, a_hl, nrows, ncols, bottom)
+        self.build_matrix(self.matrix_b_frame, b_values, b_hl, nrows, ncols, bottom)
 
-        # Матрица B — после действия (текущий режим)
-        self.build_matrix(self.matrix_b_frame, "B", values, hl, nrows, ncols, bottom)
-
-    def build_matrix(self, parent, name, values, highlight, nrows, ncols, bottom_row):
+    def build_matrix(self, parent, values, highlight, nrows, ncols, bottom_row):
         for w in parent.winfo_children():
             w.destroy()
 
@@ -380,8 +358,8 @@ class YupanaApp:
             row_frame.pack(fill=tk.X)
             ttk.Label(row_frame, text=str(r), width=3).pack(side=tk.LEFT)
             for c in range(ncols):
-                val = values[r][c]
-                text = self.format_cell(val, r, c)
+                val = values[r][c] if r < len(values) and c < len(values[r]) else 0
+                text = format_cell_display(val, r, c)
                 bg = "#E8E8FF" if (r, c) in highlight else "#FFFFFF"
                 lbl = tk.Label(row_frame, text=text, width=8, anchor=tk.CENTER,
                                relief=tk.GROOVE, bg=bg, font=("Consolas", 9))
@@ -397,13 +375,15 @@ class YupanaApp:
             for c in range(ncols):
                 if c < len(bottom_row):
                     val = bottom_row[c]
-                    text = self.format_cell(val, 0, c)
+                    text = format_cell_display(val, 0, c)
                 else:
                     text = ""
                 lbl = tk.Label(bottom_frame, text=text, width=8, anchor=tk.CENTER,
                                relief=tk.GROOVE, bg="#F0E8D0",
                                font=("Consolas", 9, "bold"))
                 lbl.pack(side=tk.LEFT)
+
+    # ── Кнопка-глиф ────────────────────────────────────────────────────────────
 
     def add_tokapu_button(self, btn_text, bg_color="#D4C5A0"):
         col = (self.action_count - 1) % self.max_cols
@@ -412,7 +392,7 @@ class YupanaApp:
         x = 10 + col * self.btn_spacing_x
         y = 5 + row * self.btn_spacing_y
 
-        needed_height = y + self.btn_height + 10
+        needed_height = y + 50 + 10
         if needed_height > int(self.tokapu_canvas.cget("height")):
             self.tokapu_canvas.config(height=needed_height)
 
@@ -423,13 +403,17 @@ class YupanaApp:
         self.tokapu_canvas.create_window(x, y, anchor=tk.NW, window=btn)
         self.tokapu_buttons.append(btn)
 
+    # ── Обработка действия ────────────────────────────────────────────────────
+
     def on_action(self, event=None):
         selected = self.action_var.get()
 
+        # Макрос yupankiN?
         if selected in self.loaded_macros:
             self.play_macro(selected)
             return
 
+        # Встроенное действие
         action = None
         for a in self.yupanki0_actions:
             if a["name"] == selected:
@@ -459,6 +443,8 @@ class YupanaApp:
         if output:
             self.log(f"  > {output}")
 
+    # ── Проигрывание макроса ───────────────────────────────────────────────────
+
     def play_macro(self, macro_name):
         macro = self.loaded_macros[macro_name]
         actions = macro.get("actions", [])
@@ -476,7 +462,7 @@ class YupanaApp:
         if desc:
             self.log(f"  {desc}")
         else:
-            self.log("  (action_desc пуст - заполните в JSON)")
+            self.log("  (описание пусто)")
 
         ctx = ActionContext(self)
         self.log(f"  \u25B6 Подпоследовательность: {len(actions)} действий")
@@ -499,6 +485,60 @@ class YupanaApp:
             "action_desc": desc,
             "actions": actions
         })
+
+    # ── Экспорт ────────────────────────────────────────────────────────────────
+
+    def export_csv(self):
+        nrows, ncols = self.get_size()
+        mode = self.mode_var.get()
+        values, _ = get_matrix_values(mode, nrows, ncols)
+        csv_str = export_matrix_csv(values, mode, ncols)
+
+        filepath = filedialog.asksaveasfilename(
+            title="Сохранить CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
+        if not filepath:
+            return
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(csv_str)
+        self.log(f"CSV сохранён: {filepath}")
+
+    def export_json(self):
+        nrows, ncols = self.get_size()
+        mode = self.mode_var.get()
+        values, _ = get_matrix_values(mode, nrows, ncols)
+        seq = self.seq if self.seq else compute_a391838_sequence(8)
+        json_str = export_sequence_json(seq, mode, values)
+
+        filepath = filedialog.asksaveasfilename(
+            title="Сохранить JSON",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+        if not filepath:
+            return
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(json_str)
+        self.log(f"JSON сохранён: {filepath}")
+
+    def export_spice(self):
+        nrows, ncols = self.get_size()
+        mode = self.mode_var.get()
+        values, _ = get_matrix_values(mode, nrows, ncols)
+        name = f"yupana_{mode}_{nrows}x{ncols}"
+        spice_str = export_spice_subcircuit(values, name, ncols)
+
+        filepath = filedialog.asksaveasfilename(
+            title="Сохранить SPICE нетлист",
+            defaultextension=".sp",
+            filetypes=[("SPICE files", "*.sp *.cir *.sub"), ("All files", "*.*")])
+        if not filepath:
+            return
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(spice_str)
+        self.log(f"SPICE нетлист сохранён: {filepath}")
+
+    # ── yupanki: сохранение ────────────────────────────────────────────────────
 
     def get_next_yupanki_number(self):
         if not os.path.isdir(YUPANKI_DIR):
@@ -551,6 +591,8 @@ class YupanaApp:
         self.log(f"Сохранено: {filepath} ({len(self.action_history)} действий)")
         return filename
 
+    # ── yupanki: загрузка ──────────────────────────────────────────────────────
+
     def load_yupanki(self):
         if not os.path.isdir(YUPANKI_DIR):
             os.makedirs(YUPANKI_DIR, exist_ok=True)
@@ -560,8 +602,7 @@ class YupanaApp:
         filepath = filedialog.askopenfilename(
             title="Выберите yupanki-файл",
             initialdir=os.path.abspath(YUPANKI_DIR),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
         if not filepath:
             return
 
@@ -598,7 +639,9 @@ class YupanaApp:
         if desc:
             self.log(f"  action_desc: {desc}")
         else:
-            self.log("  action_desc: (пусто - заполните вручную в JSON)")
+            self.log("  action_desc: (пусто)")
+
+    # ── Очистка ────────────────────────────────────────────────────────────────
 
     def clear_tokapu(self):
         saved = self.save_yupanki()
@@ -610,54 +653,13 @@ class YupanaApp:
         self.tokapu_canvas.config(height=60)
         self.log("--- Очистка Юпаны ---")
 
+    # ── Протокол ──────────────────────────────────────────────────────────────
+
     def log(self, msg):
         self.protocol_text.config(state=tk.NORMAL)
         self.protocol_text.insert(tk.END, msg + "\n")
         self.protocol_text.see(tk.END)
         self.protocol_text.config(state=tk.DISABLED)
-
-    # Экспорт
-
-    def export_csv(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        values, _ = self.get_matrix_values(mode, nrows, ncols)
-        filepath = filedialog.asksaveasfilename(
-            title="Экспорт CSV", defaultextension=".csv",
-            filetypes=[("CSV", "*.csv")])
-        if filepath:
-            export_matrix_csv(values, filepath)
-            self.log(f"Экспорт CSV: {filepath}")
-
-    def export_json(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        values, _ = self.get_matrix_values(mode, nrows, ncols)
-        seq = self.bottom_row[:ncols] if self.bottom_row else []
-        filepath = filedialog.asksaveasfilename(
-            title="Экспорт JSON", defaultextension=".json",
-            filetypes=[("JSON", "*.json")])
-        if filepath:
-            export_sequence_json(seq, filepath, metadata={
-                "mode": mode, "size": f"{nrows}x{ncols}",
-                "matrix": [[float(v) if isinstance(v, Fraction) else v
-                            for v in row] for row in values]
-            })
-            self.log(f"Экспорт JSON: {filepath}")
-
-    def export_spice(self):
-        nrows, ncols = self.get_size()
-        mode = self.mode_var.get()
-        values, _ = self.get_matrix_values(mode, nrows, ncols)
-        filepath = filedialog.asksaveasfilename(
-            title="Экспорт SPICE netlist", defaultextension=".sp",
-            filetypes=[("SPICE", "*.sp"), ("All", "*.*")])
-        if filepath:
-            spice = export_spice_subcircuit(values, name=f"yupana_{mode}",
-                                             nrows=nrows, ncols=ncols)
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(spice)
-            self.log(f"Экспорт SPICE: {filepath}")
 
 
 if __name__ == "__main__":
