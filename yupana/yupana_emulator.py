@@ -192,6 +192,14 @@ class YupanaApp:
         ttk.Button(top, text="Экспорт JSON", command=self.export_json).pack(side=tk.LEFT, padx=2)
         ttk.Button(top, text="Экспорт SPICE", command=self.export_spice).pack(side=tk.LEFT, padx=2)
 
+
+        # Переключатель DDF
+        ttk.Separator(top, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        self.ddf_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(top, text="DDF", variable=self.ddf_var,
+                        command=self.refresh).pack(side=tk.LEFT, padx=2)
+
+
         # ── Область матриц ─────────────────────────────────────────────────
         matrix_frame = ttk.Frame(self.root)
         matrix_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -278,39 +286,70 @@ class YupanaApp:
 
         symbols_dir = os.path.join(_SCRIPT_DIR, "symbols")
 
-        # ── Фиксированные размеры ──────────────────────────────────────────
         CELL_W_PX = 74
         CELL_H_PX = 56
         IMG_SIZE = (24, 24)
         CELL_W_CHARS = 10
+        HDR_H_PX = 20
+
+        ddf_on = getattr(self, 'ddf_var', None) and self.ddf_var.get()
 
         # Заголовок столбцов
         hdr = ttk.Frame(parent)
         hdr.pack(fill=tk.X)
-        ttk.Label(hdr, text="", width=3).pack(side=tk.LEFT)
+        corner = tk.Frame(hdr, width=24, height=HDR_H_PX)
+        corner.pack_propagate(False)
+        corner.pack(side=tk.LEFT)
         for c in range(ncols):
-            ttk.Label(hdr, text=str(c), width=CELL_W_CHARS, anchor=tk.CENTER).pack(side=tk.LEFT)
+            hdr_cell = tk.Frame(hdr, width=CELL_W_PX, height=HDR_H_PX)
+            hdr_cell.pack_propagate(False)
+            hdr_cell.pack(side=tk.LEFT)
+            ttk.Label(hdr_cell, text=str(c), anchor=tk.CENTER,
+                      font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
 
         # Основная матрица
         for r in range(nrows):
             row_frame = ttk.Frame(parent)
             row_frame.pack(fill=tk.X)
-            ttk.Label(row_frame, text=str(r), width=3).pack(side=tk.LEFT)
+            row_lbl_cell = tk.Frame(row_frame, width=24, height=CELL_H_PX)
+            row_lbl_cell.pack_propagate(False)
+            row_lbl_cell.pack(side=tk.LEFT)
+            tk.Label(row_lbl_cell, text=str(r), anchor=tk.CENTER,
+                     font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
 
             for c in range(ncols):
                 val = values[r][c] if r < len(values) and c < len(values[r]) else 0
                 text = format_cell_display(val, r, c)
-                bg = "#E8E8FF" if (r, c) in highlight else "#FFFFFF"
 
-                # ── Проверка диагональной формулы ────────────────────────────
+                # ── Цвет клетки ──────────────────────────────────────────────
+                if (r, c) in highlight:
+                    bg = "#E8E8FF"
+                elif hasattr(self, 'symbol_engine'):
+                    bg = self.symbol_engine.get_cell_color(r, c)
+                else:
+                    bg = "#FFFFFF"
+
+                # ── Определяем отображаемый текст ────────────────────────────
                 formula = None
+                formula_color = "#006600"   # зелёный — по умолчанию для диагоналей с t
+                formula_font = ("Consolas", 7)
+
                 if hasattr(self, 'symbol_engine'):
-                    formula = self.symbol_engine.get_diagonal_formula(r, c, val)
+                    # Проверяем: это чётный столбец и включён DDF?
+                    if ddf_on and (c - self.symbol_engine.offset[1]) % 2 == 1:
+                        # Чётный display-столбец → форма без t, красным
+                        even_formula = self.symbol_engine.get_even_col_formula(r, c, val)
+                        if even_formula:
+                            formula = even_formula
+                            formula_color = "#CC0000"   # красный
+                    else:
+                        # Нечётный display-столбец → диагональ с t, зелёным
+                        formula = self.symbol_engine.get_diagonal_formula(r, c, val)
 
                 display_text = formula if formula else text
                 if formula:
-                    txt_font = ("Consolas", 7)
-                    txt_fg = "#006600"   # тёмно-зелёный — формулы диагоналей
+                    txt_font = formula_font
+                    txt_fg = formula_color
                 else:
                     txt_font = ("Consolas", 9)
                     txt_fg = "#000000"
@@ -321,7 +360,7 @@ class YupanaApp:
                 cell.pack_propagate(False)
                 cell.pack(side=tk.LEFT)
 
-                # ── Картинка символа (если есть) ─────────────────────────────
+                # ── Картинка символа ─────────────────────────────────────────
                 has_image = False
                 if hasattr(self, 'symbol_engine'):
                     filename = self.symbol_engine.get_filename_for_symbol(r, c)
@@ -344,29 +383,31 @@ class YupanaApp:
                                 img_lbl.pack(side=tk.TOP, pady=(2, 1))
                                 has_image = True
 
-                # ── Текст: формула диагонали или значение матрицы ────────────
+                # ── Текст ────────────────────────────────────────────────────
                 txt_lbl = tk.Label(cell, text=display_text, width=CELL_W_CHARS,
                                    anchor=tk.CENTER, bg=bg, font=txt_font, fg=txt_fg)
                 txt_lbl.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
 
-        # Нижняя строка — коэффициенты последовательности
+        # Нижняя строка
         if bottom_row:
             ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=3)
             bottom_frame = ttk.Frame(parent)
             bottom_frame.pack(fill=tk.X)
-            ttk.Label(bottom_frame, text="\u2193", width=3,
-                      anchor=tk.CENTER, font=("Consolas", 9, "bold")).pack(side=tk.LEFT)
+            corner2 = tk.Frame(bottom_frame, width=24)
+            corner2.pack_propagate(False)
+            corner2.pack(side=tk.LEFT)
             for c in range(ncols):
+                b_cell = tk.Frame(bottom_frame, width=CELL_W_PX)
+                b_cell.pack_propagate(False)
+                b_cell.pack(side=tk.LEFT)
                 if c < len(bottom_row):
                     val = bottom_row[c]
                     text = format_cell_display(val, 0, c)
                 else:
                     text = ""
-                lbl = tk.Label(bottom_frame, text=text, width=CELL_W_CHARS, anchor=tk.CENTER,
-                               relief=tk.GROOVE, bg="#F0E8D0",
-                               font=("Consolas", 9, "bold"))
-                lbl.pack(side=tk.LEFT)
-
+                tk.Label(b_cell, text=text, width=CELL_W_CHARS, anchor=tk.CENTER,
+                         relief=tk.GROOVE, bg="#F0E8D0",
+                         font=("Consolas", 9, "bold")).pack(expand=True, fill=tk.BOTH)
 
 
 
@@ -657,3 +698,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = YupanaApp(root)
     root.mainloop()
+
